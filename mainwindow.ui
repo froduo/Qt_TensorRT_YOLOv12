@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1000</width>
+    <height>720</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>YOLOv12 智能视觉监控核心</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">
+    QMainWindow {
+        background-color: #0A0E14; /* 深海黑背景 */
+    }
+
+    /* 侧边栏面板 */
+    #sidePanel {
+        background-color: #141923;
+        border-left: 2px solid #1A202C;
+    }
+
+    /* 主图像区域 */
+    #imageLabel {
+        background-color: #000000;
+        border: 2px solid #00F0FF;
+        border-radius: 4px;
+        color: #00F0FF;
+        font-family: 'Consolas';
+        font-weight: bold;
+    }
+
+    /* 按钮通用样式 - 荧光青 */
+    QPushButton {
+        background-color: rgba(0, 240, 255, 0.05);
+        border: 1px solid #00F0FF;
+        border-radius: 2px;
+        color: #00F0FF;
+        padding: 10px;
+        font-family: 'MicroSoft YaHei';
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+    QPushButton:hover {
+        background-color: rgba(0, 240, 255, 0.2);
+    }
+    QPushButton:pressed {
+        background-color: #00F0FF;
+        color: #0A0E14;
+    }
+
+    /* 关闭按钮 - 荧光橙红 (警告色) */
+    QPushButton#btnClose {
+        border: 1px solid #FF3C00;
+        color: #FF3C00;
+        background-color: rgba(255, 60, 0, 0.05);
+    }
+    QPushButton#btnClose:hover {
+        background-color: rgba(255, 60, 0, 0.2);
+    }
+
+    /* 状态栏 */
+    QStatusBar {
+        background-color: #0D1117;
+        color: #586069;
+        border-top: 1px solid #21262D;
+    }
+
+    /* 菜单栏 */
+    QMenuBar {
+        background-color: #0D1117;
+        color: #C9D1D9;
+        border-bottom: 1px solid #21262D;
+    }
+    QMenuBar::item:selected {
+        background-color: #00F0FF;
+        color: #0A0E14;
+    }
+   </string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QHBoxLayout" name="horizontalLayout" stretch="5,1">
+    <property name="spacing">
+     <number>15</number>
+    </property>
+    <property name="leftMargin">
+     <number>10</number>
+    </property>
+    <property name="topMargin">
+     <number>10</number>
+    </property>
+    <property name="rightMargin">
+     <number>10</number>
+    </property>
+    <property name="bottomMargin">
+     <number>10</number>
+    </property>
+    <item>
+     <widget class="QLabel" name="imageLabel">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Ignored" vsizetype="Ignored">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>100</width>
+        <height>100</height>
+       </size>
+      </property>
+      <property name="text">
+       <string>SYSTEM READY
+WAITING FOR VIDEO STREAM...</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <layout class="QVBoxLayout" name="verticalLayout_2">
+      <property name="spacing">
+       <number>20</number>
+      </property>
+      <item>
+       <widget class="QLabel" name="label_title">
+        <property name="styleSheet">
+         <string notr="true">color: #586069; font-weight: bold; letter-spacing: 2px;</string>
+        </property>
+        <property name="text">
+         <string>CONTROL PANEL</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnOpen">
+        <property name="text">
+         <string>START CAMERA</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnClose">
+        <property name="text">
+         <string>STOP SYSTEM</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnOpenImage">
+        <property name="text">
+         <string>OFFLINE INFER</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="verticalSpacer">
+        <property name="orientation">
+         <enum>Qt::Vertical</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>20</width>
+          <height>40</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnSetParams">
+        <property name="text">
+         <string>SYS CONFIG</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1000</width>
+     <height>22</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menu">
+    <property name="title">
+     <string>Settings</string>
+    </property>
+    <addaction name="separator"/>
+   </widget>
+   <widget class="QMenu" name="menuAbout">
+    <property name="title">
+     <string>About</string>
+    </property>
+    <addaction name="actionversion"/>
+   </widget>
+   <addaction name="menu"/>
+   <addaction name="menuAbout"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="btnOpen_2">
+   <property name="text">
+    <string>打开相机</string>
+   </property>
+  </action>
+  <action name="action_3">
+   <property name="text">
+    <string>打开图片</string>
+   </property>
+  </action>
+  <action name="action_4">
+   <property name="text">
+    <string>关闭相机</string>
+   </property>
+  </action>
+  <action name="actionversion">
+   <property name="text">
+    <string>version</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
