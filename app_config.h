@@ -4,6 +4,7 @@
 #include <QString>
 #include <QSettings>
 #include <QCoreApplication>
+#include <QDebug>
 
 struct AppConfig {
     // 相机参数
@@ -21,7 +22,8 @@ struct AppConfig {
 
     // 推理参数
     double scoreThreshold = 0.25; // 默认得分阈值
-    QString enginePath = "./model/yolo12n_trt8.engine"; // 新增推理路径
+    QString enginePath = "./model/yolo12n_trt10_x86.engine"; // 新增推理路径
+    QString classesPath = "./model/coco.yaml"; // 检测类别文件路径
     // 保存到文件
     void save() {
         QString path = QCoreApplication::applicationDirPath() + "/config.ini";
@@ -45,10 +47,8 @@ struct AppConfig {
 
         s.beginGroup("Inference");
         s.setValue("ScoreThreshold", scoreThreshold);
-        s.endGroup();
-        s.beginGroup("Inference");
-        s.setValue("ScoreThreshold", scoreThreshold);
         s.setValue("EnginePath", enginePath); // 保存路径
+        s.setValue("ClassesPath", classesPath); // 保存类别文件路径
         s.endGroup();
         s.sync(); // 强制将内存中的设置立即写入磁盘文件
     }
@@ -66,8 +66,9 @@ struct AppConfig {
         netIp = s.value("Network/IP", "192.168.200.172").toString();
         netPort = s.value("Network/Port", 8080).toInt();
 
-        enginePath = s.value("Inference/EnginePath", "./model/yolo12n_trt8.engine").toString();
+        enginePath = s.value("Inference/EnginePath", "./model/yolo12n_trt10_x86.engine").toString();
         scoreThreshold = s.value("Inference/ScoreThreshold", 0.25).toDouble();
+        classesPath = s.value("Inference/ClassesPath", "./model/coco.yaml").toString();
     }
 };
 

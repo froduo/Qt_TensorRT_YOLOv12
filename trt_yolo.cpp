@@ -82,9 +82,12 @@ bool TrtYolo::loadEngine(const std::string& enginePath)
     auto outDims = engine->getTensorShape(outputTensorName.c_str());
     outputSize = getSizeByDim(outDims) * sizeof(float);
 
-    std::cout << "Output shape: ";
+    // ⭐ 日志：输出模型路径和张量形状
+    std::cout << "[TrtYolo] Engine: " << enginePath << std::endl;
+    std::cout << "[TrtYolo] Output shape: ";
     for(int i=0; i<outDims.nbDims; i++) std::cout << outDims.d[i] << " ";
     std::cout << std::endl;
+    std::cout << "[TrtYolo] Output size: " << outputSize << " bytes" << std::endl;
 
     hostInput.resize(inputSize/sizeof(float));
     hostOutput.resize(outputSize/sizeof(float));
@@ -108,11 +111,13 @@ void TrtYolo::preprocess(const cv::Mat& img)
     cv::Mat resized;
     cv::resize(img, resized, cv::Size(newW, newH));
 
-    padX = (inputW - newW) / 2;
-    padY = (inputH - newH) / 2;
+    // ⭐ 使用浮点除法保持精度，与 postprocess 中的坐标还原保持一致
+    padX = (inputW - newW) / 2.0f;
+    padY = (inputH - newH) / 2.0f;
 
     cv::Mat padded(inputH, inputW, CV_8UC3, cv::Scalar(114,114,114));
-    resized.copyTo(padded(cv::Rect(padX, padY, newW, newH)));
+    // cv::Rect 需要整数坐标，使用 static_cast<int> 确保与 postprocess 中的浮点还原一致
+    resized.copyTo(padded(cv::Rect(static_cast<int>(padX), static_cast<int>(padY), newW, newH)));
 
     cv::Mat rgb;
     cv::cvtColor(padded, rgb, cv::COLOR_BGR2RGB);
@@ -149,10 +154,27 @@ void TrtYolo::postprocess(std::vector<Detection>& results)
 
     // 获取输出维度 (TensorRT 10 API)
     auto outDims = engine->getTensorShape(outputTensorName.c_str());
+    if (outDims.nbDims < 3) return;
 
-    int numAttr = outDims.d[1];
-    int numPred = outDims.d[2];
+    // ⭐ 自动检测输出张量布局：
+    // 布局 A: [1, numAttr, numPred] 例如 [1, 84, 8400]
+    // 布局 B: [1, numPred, numAttr] 例如 [1, 8400, 84]
+    const int d1 = outDims.d[1];
+    const int d2 = outDims.d[2];
+
+    int numAttr, numPred;
+    // 如果 d1 较小（6~512 范围）且 d2 远大于 d1，则为 [1, attr, pred] 布局
+    if (d1 >= 6 && d1 <= 512 && d2 > d1) {
+        numAttr = d1;
+        numPred = d2;
+    } else {
+        // 否则假设为 [1, pred, attr] 布局
+        numPred = d1;
+        numAttr = d2;
+    }
+
     int numClasses = numAttr - 4;
+    if (numClasses <= 0) return;
 
     std::vector<cv::Rect> boxes;
     std::vector<float> scores;
@@ -181,22 +203,23 @@ void TrtYolo::postprocess(std::vector<Detection>& results)
         float w  = hostOutput[2 * numPred + i];
         float h  = hostOutput[3 * numPred + i];
 
-        cx -= padX;
-        cy -= padY;
-        cx /= scale;
-        cy /= scale;
-        w  /= scale;
-        h  /= scale;
+        cx = (cx - padX) / scale;
+        cy = (cy - padY) / scale;
+        w  = w / scale;
+        h  = h / scale;
 
         int x = int(cx - w / 2);
         int y = int(cy - h / 2);
 
         x = std::max(0, x);
         y = std::max(0, y);
-        w = std::min((int)w, lastImage.cols - x);
-        h = std::min((int)h, lastImage.rows - y);
+        int iw = std::min((int)w, lastImage.cols - x);
+        int ih = std::min((int)h, lastImage.rows - y);
 
-        boxes.emplace_back(x, y, w, h);
+        // ⭐ 跳过无效检测框
+        if (iw <= 0 || ih <= 0) continue;
+
+        boxes.emplace_back(x, y, iw, ih);
         scores.push_back(maxScore);
         classIds.push_back(classId);
     }
@@ -214,6 +237,22 @@ void TrtYolo::postprocess(std::vector<Detection>& results)
         det.score = scores[idx];
         det.class_id = classIds[idx];
         results.push_back(det);
+    }
+
+    // ⭐ 日志：输出检测结果统计
+    std::cout << "[TrtYolo] Postprocess: numAttr=" << numAttr
+              << " numPred=" << numPred
+              << " numClasses=" << numClasses
+              << " rawBoxes=" << boxes.size()
+              << " afterNMS=" << results.size()
+              << " confThresh=" << confThreshold
+              << std::endl;
+    if (!results.empty()) {
+        std::cout << "[TrtYolo] Top detection: class=" << results[0].class_id
+                  << " score=" << results[0].score
+                  << " box=[" << results[0].x << "," << results[0].y
+                  << "," << results[0].w << "," << results[0].h << "]"
+                  << std::endl;
     }
 }
 // draw 函数保持不变...

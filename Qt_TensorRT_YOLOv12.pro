@@ -11,10 +11,12 @@ CONFIG += c++17
 SOURCES += \
     cameracontroller.cpp \
     grabthread.cpp \
+    imageview.cpp \
     inferthread.cpp \
     main.cpp \
     mainwindow.cpp \
     networkmanager.cpp \
+    offlineverifyform.cpp \
     serialmanager.cpp \
     settingform.cpp \
     trt_yolo.cpp
@@ -23,16 +25,19 @@ HEADERS += \
     app_config.h \
     cameracontroller.h \
     grabthread.h \
+    imageview.h \
     inferthread.h \
     logger.h \
     mainwindow.h \
     networkmanager.h \
+    offlineverifyform.h \
     serialmanager.h \
     settingform.h \
     trt_yolo.h
 
 FORMS += \
     mainwindow.ui \
+    offlineverifyform.ui \
     settingform.ui
 
 # Default rules for deployment.

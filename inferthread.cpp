@@ -1,4 +1,5 @@
 #include "inferthread.h"
+#include "logger.h"
 #include <QFileInfo>
 #include <QDebug>
 #include <QElapsedTimer>
@@ -29,9 +30,13 @@ bool InferThread::setEngine(const QString &enginePath)
     QFileInfo fi(enginePath);
     if (!fi.exists())
     {
+        LOG_ERR(QString("Engine file not found: %1").arg(enginePath));
         emit engineLoadFailed("Engine file not found:\n" + enginePath);
         return false;
     }
+
+    // ⭐ 日志：记录加载的模型路径
+    LOG_INFO(QString("Loading TensorRT engine: %1").arg(enginePath));
 
     try
     {
@@ -43,11 +48,13 @@ bool InferThread::setEngine(const QString &enginePath)
 
         yolo = new TrtYolo(enginePath.toStdString(), logger);
 
+        LOG_INFO("TensorRT engine loaded successfully.");
         qDebug() << "TensorRT engine loaded successfully.";
         return true;
     }
     catch (std::exception& e)
     {
+        LOG_ERR(QString("TensorRT init failed: %1").arg(e.what()));
         emit engineLoadFailed(QString("TensorRT init failed: %1").arg(e.what()));
         return false;
     }
@@ -57,6 +64,7 @@ void InferThread::stop()
 {
     QMutexLocker locker(&mutex);
     m_running = false;
+    m_frame.release();  // 释放待处理帧，确保 wait 不会卡住
     cond.wakeAll();
 }
 
@@ -69,6 +77,12 @@ void InferThread::setFrame(const cv::Mat &frame)
 
 void InferThread::run()
 {
+    // ⭐ 重置运行标志，因为 stop() 将其设为 false，而 start() 不会自动重置
+    {
+        QMutexLocker locker(&mutex);
+        m_running = true;
+    }
+
     QElapsedTimer fpsTimer;
     fpsTimer.start();
 
@@ -109,6 +123,11 @@ void InferThread::run()
 
         float inferTimeMs = inferTimer.elapsed();
         int detCount = results.size();
+
+        // ⭐ 日志：记录每帧推理结果
+        qDebug() << "[InferThread] Inference completed:"
+                 << detCount << "detections,"
+                 << QString::number(inferTimeMs, 'f', 1) << "ms";
 
         // 画检测框
         yolo->draw(img, results);

@@ -11,6 +11,8 @@
 #include "networkmanager.h"
 #include "app_config.h"
 #include "settingform.h"
+#include "offlineverifyform.h"
+#include "imageview.h"
 #include"logger.h"
 
 // 1. 声明 Ui 命名空间
@@ -34,6 +36,7 @@ private slots:
     void onCameraDisconnected();
     void onEngineLoadFailed(QString msg);
     void onSetParams();
+    void openOfflineVerify();
 private:
     // 2. 定义 ui 指针
     Ui::MainWindow *ui;
@@ -60,6 +63,9 @@ private:
 
     AppConfig m_config;
     void applySettings(); // 应用配置到各个模块
+
+    // 主界面 ImageView（用于显示视频/推理结果，支持缩放拖拽）
+    ImageView* m_imageView {nullptr};
 
 private slots:
     void onUpdateSystemTime(); // 更新时间槽函数

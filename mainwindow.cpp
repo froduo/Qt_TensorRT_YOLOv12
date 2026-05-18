@@ -2,85 +2,86 @@
 #include "ui_mainwindow.h"
 #include <QMessageBox>
 #include <QFileDialog>
-#include<qtimer.h>
+#include <QTimer>
+#include <QBoxLayout>
+#include <QCoreApplication>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
-    // [0] 基础 UI 初始化
     ui->setupUi(this);
-    // [1] 加载本地配置文件
-    LOG_INFO("Software starting..."); // 记录启动
+    LOG_INFO("Software starting...");
     m_config.load();
     LOG_INFO("Config loaded.");
-    // 设置带日期版本号的窗口标题
     QString title = QString("YOLOv12 Sensor Core [%1]").arg(APP_VERSION_STR);
     this->setWindowTitle(title);
 
     LOG_INFO("Software starting... Version: " + QString(APP_VERSION_STR));
-    // [2] 核心管理对象实例化 (仅分配内存)
     grabThread = nullptr;
     inferThread = new InferThread(this);
     serialMgr = new SerialManager(this);
     networkMgr = new NetworkManager(this);
 
-    // [3] 状态栏 UI 组件创建与布局 (Permanent Widget)
-    // --- [3] 状态栏 UI 增强设计 ---
+    QGraphicsView* oldView = ui->imageView;
+    if (oldView) {
+        m_imageView = new ImageView(this);
+        m_imageView->setObjectName("imageView");
+        m_imageView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        m_imageView->setStyleSheet("background-color: #050812; border: 2px solid #4a6fa5; border-radius: 12px;");
+        
+        QBoxLayout* parentLayout = qobject_cast<QBoxLayout*>(oldView->parentWidget()->layout());
+        if (parentLayout) {
+            int idx = parentLayout->indexOf(oldView);
+            if (idx >= 0) {
+                parentLayout->removeWidget(oldView);
+                parentLayout->insertWidget(idx, m_imageView);
+            }
+        }
+        delete oldView;
+    }
 
-    // 辅助样式定义
-    QString titleStyle = "color: #00F0FF; font-family: 'Consolas'; font-weight: bold; margin-left: 10px;";
-    QString valueStyle = "color: #FFFFFF; font-family: 'Consolas'; margin-left: 5px; margin-right: 5px;";
+    QString titleStyle = "color: #7ad7ff; font-family: 'Consolas'; font-weight: bold; margin-left: 10px;";
 
-    // 3.1 网口区块 (NET)
     QLabel* netTitle = new QLabel("NET:", this);
     netTitle->setStyleSheet(titleStyle);
     netLed = new QLabel(this);
-    setLedStatus(netLed, false); // 初始红色
+    setLedStatus(netLed, false);
 
-    // 3.2 串口区块 (COM)
     QLabel* serTitle = new QLabel("COM:", this);
     serTitle->setStyleSheet(titleStyle);
     serialLed = new QLabel(this);
     setLedStatus(serialLed, false);
 
-    // 3.3 相机区块 (CAM)
     statusLabel = new QLabel("CAM: OFFLINE", this);
-    statusLabel->setStyleSheet("color: #FF3C00; font-family: 'Consolas'; font-weight: bold; padding: 0 15px;");
+    statusLabel->setStyleSheet("color: #ff9fb1; font-family: 'Consolas'; font-weight: bold; padding: 0 15px;");
 
-    // 3.4 时间区块 (TIME)
     timeLabel = new QLabel(this);
-    timeLabel->setStyleSheet("color: #00F0FF; font-family: 'Consolas'; font-size: 14px; padding: 0 10px; border-left: 1px solid #2D3748;");
+    timeLabel->setStyleSheet("color: #7ad7ff; font-family: 'Consolas'; font-size: 14px; padding: 0 10px; border-left: 1px solid #2e3a51;");
 
-    // 3.5 按照逻辑顺序添加到状态栏
     ui->statusbar->addPermanentWidget(netTitle);
     ui->statusbar->addPermanentWidget(netLed);
-    ui->statusbar->addPermanentWidget(new QLabel("  ")); // 间距
+    ui->statusbar->addPermanentWidget(new QLabel("  "));
 
     ui->statusbar->addPermanentWidget(serTitle);
     ui->statusbar->addPermanentWidget(serialLed);
-    ui->statusbar->addPermanentWidget(new QLabel("  ")); // 间距
+    ui->statusbar->addPermanentWidget(new QLabel("  "));
 
     ui->statusbar->addPermanentWidget(statusLabel);
     ui->statusbar->addPermanentWidget(timeLabel);
 
-    // 设置状态栏整体背景
-    ui->statusbar->setStyleSheet("QStatusBar { background-color: #0D1117; border-top: 1px solid #00F0FF; }");
+    ui->statusbar->setStyleSheet("QStatusBar { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #151d2e, stop:1 #0f172a); border-top: 1px solid #2e4a6a; }");
 
-    // [4] 信号与槽连接 (必须放在 Open 操作之前，确保信号不丢失)
-
-    // 4.1 核心推理与相机信号
     connect(inferThread, &InferThread::engineLoadFailed, this, &MainWindow::onEngineLoadFailed);
     connect(inferThread, &InferThread::sendResult, this, &MainWindow::updateImage);
     connect(&camera, &CameraController::deviceDisconnected, this, &MainWindow::onCameraDisconnected);
 
-    // 4.2 按钮交互信号
     connect(ui->btnOpen, &QPushButton::clicked, this, &MainWindow::onOpen);
     connect(ui->btnClose, &QPushButton::clicked, this, &MainWindow::onCloseCamera);
-    connect(ui->btnOpenImage, &QPushButton::clicked, this, &MainWindow::onOpenImage);
-    connect(ui->btnSetParams, &QPushButton::clicked, this, &MainWindow::onSetParams);
+    connect(ui->actionOfflineInfer, &QAction::triggered, this, &MainWindow::onOpenImage);
+    connect(ui->actionSysConfig, &QAction::triggered, this, &MainWindow::onSetParams);
+    connect(ui->actionOfflineVerify, &QAction::triggered, this, &MainWindow::openOfflineVerify);
 
-    // 4.3 网络与串口通信信号
     connect(networkMgr, &NetworkManager::statusChanged, this, [=](bool connected){
         setLedStatus(netLed, connected);
     });
@@ -92,38 +93,42 @@ MainWindow::MainWindow(QWidget *parent)
         ui->statusbar->showMessage("收到指令: " + cmd, 2000);
     });
 
-    // [5] 系统初始状态设置
     ui->btnClose->setEnabled(false);
     setLedStatus(netLed, false);
     setLedStatus(serialLed, false);
 
-    // [6] 启动项 (加载、开启、连接)
-
-    // 6.1 加载模型引擎
-    if(!inferThread->setEngine("./model/yolo12n_trt10_x86.engine")) {
-        QTimer::singleShot(100, this, [=](){
-            QMessageBox::critical(this,"Error","Model load failed");
-        });
+    LOG_INFO(QString("Loading TensorRT engine from config: %1").arg(m_config.enginePath));
+    if(!inferThread->setEngine(m_config.enginePath)) {
+        LOG_WARN(QString("Config engine path failed, trying default: ./model/yolo12n_trt10_x86.engine"));
+        if(!inferThread->setEngine("./model/yolo12n_trt10_x86.engine")) {
+            QTimer::singleShot(100, this, [=](){
+                QMessageBox::critical(this,"Error","Model load failed");
+            });
+            ui->label_model->setText("MODEL: FAILED");
+            ui->label_model->setStyleSheet("color: #FFCDD2; font-family: 'Consolas'; font-size: 11px; font-weight: 600; text-shadow: 0 0 3px #C62828, 0 0 6px #EF5350, 0 0 10px #E57373;");
+        } else {
+            inferThread->start(QThread::HighPriority);
+            ui->label_model->setText("MODEL: LOADED");
+            ui->label_model->setStyleSheet("color: #81C784; font-family: 'Consolas'; font-size: 11px; font-weight: 600; text-shadow: 0 0 3px #2E7D32, 0 0 6px #4CAF50, 0 0 10px #66BB6A;");
+        }
     } else {
         inferThread->start(QThread::HighPriority);
+        ui->label_model->setText("MODEL: LOADED");
+        ui->label_model->setStyleSheet("color: #81C784; font-family: 'Consolas'; font-size: 11px; font-weight: 600; text-shadow: 0 0 3px #2E7D32, 0 0 6px #4CAF50, 0 0 10px #66BB6A;");
     }
 
-    // 6.2 启动系统时间定时器
     sysTimer = new QTimer(this);
     connect(sysTimer, &QTimer::timeout, this, &MainWindow::onUpdateSystemTime);
     sysTimer->start(1000);
-    onUpdateSystemTime(); // 立即初始化时间
+    onUpdateSystemTime();
 
-    // 6.3 尝试打开默认外设连接
-    // 注意：这里的 openPort 会触发 statusChanged 信号，
-    // 因为信号槽已经在第 [4] 步连好了，所以灯会正确变色
     serialMgr->openPort(m_config.serialPort, m_config.baudRate);
     networkMgr->connectToServer(m_config.netIp, m_config.netPort);
 }
 
 MainWindow::~MainWindow()
 {
-    stopGrabbing(); // 析构时确保线程停止
+    stopGrabbing();
     if(inferThread) {
         inferThread->requestInterruption();
         inferThread->quit();
@@ -132,13 +137,12 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-// ⭐ 封装停止逻辑，防止代码重复
 void MainWindow::stopGrabbing()
 {
     if(grabThread)
     {
-        grabThread->stop(); // 设置标志位
-        grabThread->wait(); // 等待线程安全退出
+        grabThread->stop();
+        grabThread->wait();
         delete grabThread;
         grabThread = nullptr;
     }
@@ -150,14 +154,13 @@ void MainWindow::stopGrabbing()
     updateCameraStatus(false);
 }
 
-// ⭐ 实现关闭相机槽函数
 void MainWindow::onCloseCamera()
 {
     stopGrabbing();
 
-    // UI 反馈
-    ui->imageLabel->clear();
-    ui->imageLabel->setText("Camera Closed");
+    if (m_imageView) {
+        m_imageView->setImage(QImage());
+    }
     ui->btnOpen->setEnabled(true);
     ui->btnClose->setEnabled(false);
 }
@@ -165,12 +168,14 @@ void MainWindow::onCloseCamera()
 void MainWindow::onOpen()
 {
     LOG_INFO("Attempting to open camera...");
-    // 防止重复打开
-    if(grabThread || camera.isOpen()) {
+    if(grabThread && camera.isOpen()) {
         QMessageBox::information(this, "Info", "Camera is already running.");
         return;
     }
-    // 枚举设备
+    if(grabThread || camera.isOpen()) {
+        LOG_WARN("Inconsistent camera state detected, cleaning up...");
+        stopGrabbing();
+    }
     std::vector<MV_CC_DEVICE_INFO*> list;
     if(!camera.enumDevices(list) || list.empty())
     {
@@ -179,11 +184,10 @@ void MainWindow::onOpen()
     }
 
     int targetIdx = -1;
-    for(int i = 0; i < list.size(); ++i) {
-        // 海康 SDK 中的序列号字段比较
+    for(size_t i = 0; i < list.size(); ++i) {
         QString currentSN = QString((char*)list[i]->SpecialInfo.stGigEInfo.chSerialNumber);
         if(currentSN == m_config.cameraSN) {
-            targetIdx = i;
+            targetIdx = static_cast<int>(i);
             break;
         }
         qDebug()<<"currentSN:"<<currentSN;
@@ -196,15 +200,14 @@ void MainWindow::onOpen()
 
     if(!camera.openCamera(targetIdx))
     {
-        updateCameraStatus(false); // 确保状态正确
-        LOG_ERR("Failed to open camera index: " + QString::number(targetIdx)); // 记录错误
+        updateCameraStatus(false);
+        LOG_ERR("Failed to open camera index: " + QString::number(targetIdx));
         QMessageBox::critical(this,"Error","Open camera failed");
         return;
     }
     LOG_INFO(QString("Camera opened successfully. SN: %1").arg(m_config.cameraSN));
     updateCameraStatus(true);
-    // ⭐ 相机打开成功后，应用一次界面上当前的数值
-    // 否则相机会用默认参数跑
+
     camera.setExposureTime(m_config.exposure);
     camera.setGain(m_config.gain);
 
@@ -217,101 +220,87 @@ void MainWindow::onOpen()
 
     grabThread->start(QThread::HighestPriority);
 
-    // 更新按钮状态
     ui->btnOpen->setEnabled(false);
     ui->btnClose->setEnabled(true);
+
+    ui->label_exp->setText(QString("EXP: %1 us").arg(static_cast<int>(m_config.exposure)));
+    ui->label_exp->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
+    ui->label_gain->setText(QString("GAIN: %1").arg(m_config.gain));
+    ui->label_gain->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
 }
 
 void MainWindow::onOpenImage()
 {
-    QString file = QFileDialog::getOpenFileName(this, "Open Image", "", "Images (*.jpg *.png *.bmp)");
+    QString file = QFileDialog::getOpenFileName(
+        this,
+        "选择图片文件",
+        QCoreApplication::applicationDirPath(),
+        "图像文件 (*.jpg *.png *.bmp);;所有文件 (*)",
+        nullptr,
+        QFileDialog::DontResolveSymlinks
+    );
+    
     if(file.isEmpty()) return;
 
-    // 处理中文路径
+    LOG_INFO(QString("Offline inference image: %1").arg(file));
+
     cv::Mat img = cv::imread(file.toLocal8Bit().toStdString());
     if(img.empty())
     {
+        LOG_ERR(QString("Failed to load image: %1").arg(file));
         QMessageBox::critical(this,"Error","Failed to load image");
         return;
     }
 
-    // ⭐ 如果相机正在运行，先停止
     if(grabThread)
     {
-        onCloseCamera(); // 复用关闭逻辑
+        onCloseCamera();
     }
 
     inferThread->setFrame(img);
 
-    // 2. 开启 10 秒压力测试
-    // 假设你的 inferThread 有一个模式可以持续处理同一张图
-    // 或者我们直接在主循环里模拟发送
+    ui->statusbar->showMessage("正在进行离线推理测试...");
 
-    QElapsedTimer timer;
-    timer.start();
+    inferThread->setFrame(img);
+    QCoreApplication::processEvents();
+    QThread::msleep(33);
 
-    // 提示用户正在测试
-    ui->statusbar->showMessage("正在进行10秒静态稳定性测试...");
-
-    while(timer.elapsed() < 10000) // 10000 毫秒 = 10 秒
-    {
-        // 将图片传给推理线程处理
-        inferThread->setFrame(img);
-        // 给 UI 刷新的机会，否则界面会卡死
-        QCoreApplication::processEvents();
-        // 控制一下速度，模拟 30FPS，避免把 CPU/GPU 跑满到发热降频
-        QThread::msleep(33);
-    }
-    ui->statusbar->showMessage("测试完成", 3000);
+    LOG_INFO(QString("Offline inference completed, image: %1").arg(file));
+    ui->statusbar->showMessage("离线推理完成", 3000);
 }
 
-void MainWindow::updateImage(QImage img, float inferTimeMs, float fps,  std::vector<Detection> results)
+void MainWindow::updateImage(QImage img, float inferTimeMs, float fps, std::vector<Detection> results)
 {
-    // 1. UI 更新代码 ...
-    if(img.isNull()) return; // 防止空图导致闪烁
-    if(ui->imageLabel->size().isEmpty()) return;
+    if(img.isNull()) return;
+    if(!m_imageView || m_imageView->size().isEmpty()) return;
 
-    /// 如果界面最小化，停止渲染以节省资源
     if(this->isMinimized()) return;
 
-    // 性能优化：根据图像大小动态选择缩放算法
-    Qt::TransformationMode mode = Qt::FastTransformation;
-    if (img.width() < 1000) {
-        mode = Qt::SmoothTransformation; // 小图用平滑，大图用快速
-    }
+    m_imageView->setImage(img);
 
-    ui->imageLabel->setPixmap(QPixmap::fromImage(img).scaled(
-        ui->imageLabel->size(), Qt::KeepAspectRatio, mode));
+    ui->label_fps->setText(QString("FPS: %1").arg(QString::number(fps, 'f', 1)));
+    ui->label_fps->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
+    ui->label_inferTime->setText(QString("TIME: %1ms").arg(QString::number(inferTimeMs, 'f', 1)));
+    ui->label_inferTime->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
+    ui->label_detCount->setText(QString("DET: %1").arg(results.size()));
+    ui->label_detCount->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
 
-    // 在状态栏临时显示推理信息
-    QString telemetry = QString(">> INF: %1ms | FPS: %2 | DET: %3")
-                            .arg(QString::number(inferTimeMs, 'f', 1))
-                            .arg(QString::number(fps, 'f', 1))
-                            .arg(results.size());
-
-    ui->statusbar->showMessage(telemetry);
-
-    // 2. 网口发送：传输所有检测到的目标数据
     if(!results.empty()) {
         networkMgr->sendDetectionResults(results);
     }
 
-    // 3. 串口发送：云台追踪逻辑 (示例：追踪第一个检测到的目标)
-    if(!results.empty()) {
-        // 计算目标中心点相对于画面中心的偏移
-        int frameCenterX = 640 / 2; // 假设输入 640
+    if(!results.empty() && serialMgr->isOpen()) {
+        int frameCenterX = 640 / 2;
         int frameCenterY = 640 / 2;
         int detCenterX = results[0].x + results[0].w / 2;
         int detCenterY = results[0].y + results[0].h / 2;
-        if (serialMgr->isOpen()) {
-            serialMgr->controlGimbal(detCenterX - frameCenterX, detCenterY - frameCenterY);
-        }
+        serialMgr->controlGimbal(detCenterX - frameCenterX, detCenterY - frameCenterY);
     }
 }
+
 void MainWindow::onCameraDisconnected()
 {
-    LOG_WARN("Camera device disconnected unexpectedly!"); // 记录告警
-    // 相机断开处理
+    LOG_WARN("Camera device disconnected unexpectedly!");
     stopGrabbing();
     updateCameraStatus(false);
     QMessageBox::critical(this,"Error","Camera disconnected!");
@@ -322,100 +311,116 @@ void MainWindow::onCameraDisconnected()
 
 void MainWindow::onEngineLoadFailed(QString msg)
 {
-    LOG_ERR("TensorRT Engine Load Failed: " + msg); // 记录核心故障
+    LOG_ERR("TensorRT Engine Load Failed: " + msg);
     QMessageBox::critical(this, "TensorRT Engine Error", msg);
+    ui->label_model->setText("MODEL: FAILED");
+    ui->label_model->setStyleSheet("color: #FFCDD2; font-family: 'Consolas'; font-size: 11px; font-weight: 600; text-shadow: 0 0 3px #C62828, 0 0 6px #EF5350, 0 0 10px #E57373;");
 }
-// ⭐ 实现参数设置槽函数
+
 void MainWindow::onSetParams()
 {
-    // 弹出配置对话框，传入当前配置
     settingForm dlg(m_config, this);
     int res = dlg.exec();
-    if (res== QDialog::Accepted)
+    if (res == QDialog::Accepted)
     {
         QString oldPath = m_config.enginePath;
-        // 1. 获取界面上的新配置
         m_config = dlg.getUpdatedConfig();
-        // 2. 保存到本地 config.ini
         m_config.save();
-        LOG_INFO("System parameters updated and saved to config.ini"); // 记录操作
-        // 3. 立即应用到运行中的模块
+        LOG_INFO("System parameters updated and saved to config.ini");
 
-        // 更新相机参数（如果相机已打开）
         if(camera.isOpen()){
             camera.setExposureTime(m_config.exposure);
             camera.setGain(m_config.gain);
+            ui->label_exp->setText(QString("EXP: %1 us").arg(static_cast<int>(m_config.exposure)));
+            ui->label_exp->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
+            ui->label_gain->setText(QString("GAIN: %1").arg(m_config.gain));
+            ui->label_gain->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
         }
 
-        // 重新连接串口
         serialMgr->closePort();
         serialMgr->openPort(m_config.serialPort, m_config.baudRate);
 
-        // 重新连接网口
         networkMgr->disconnect();
         networkMgr->connectToServer(m_config.netIp, m_config.netPort);
 
         if (oldPath != m_config.enginePath) {
-            // 执行热重载
-            inferThread->stop(); // 先停止旧线程
+            inferThread->stop();
             inferThread->wait();
             if(inferThread->setEngine(m_config.enginePath)) {
                 inferThread->start();
                 ui->statusbar->showMessage("推理引擎已重新加载", 3000);
+                ui->label_model->setText("MODEL: LOADED");
+                ui->label_model->setStyleSheet("color: #81C784; font-family: 'Consolas'; font-size: 11px; font-weight: 600; text-shadow: 0 0 3px #2E7D32, 0 0 6px #4CAF50, 0 0 10px #66BB6A;");
+            } else {
+                ui->label_model->setText("MODEL: FAILED");
+                ui->label_model->setStyleSheet("color: #FFCDD2; font-family: 'Consolas'; font-size: 11px; font-weight: 600; text-shadow: 0 0 3px #C62828, 0 0 6px #EF5350, 0 0 10px #E57373;");
             }
         }
-        // --- 应用新阈值到推理线程 ---
-        // 假设你的 inferThread 有一个接口或者可以直接访问 yolo 引擎
         inferThread->setScoreThreshold(m_config.scoreThreshold);
         QMessageBox::information(this, "成功", "参数已保存并实时应用");
     }
-    return;
 }
-// 更新系统时间
+
+void MainWindow::openOfflineVerify()
+{
+    OfflineVerifyForm dlg(this);
+    dlg.exec();
+}
+
 void MainWindow::onUpdateSystemTime()
 {
     QString currentTime = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
     timeLabel->setText(currentTime);
 }
 
-// 统一更新相机连接状态显示
 void MainWindow::updateCameraStatus(bool connected)
 {
     if(connected)
     {
-        statusLabel->setText("CAM: ● ACTIVE");
-        statusLabel->setStyleSheet("color: #00FFC2; font-family: 'Consolas'; font-weight: bold; padding: 0 15px;");
+        statusLabel->setText("CAM: ONLINE");
+        statusLabel->setStyleSheet("color: #8dffbf; font-family: 'Consolas'; font-weight: bold; padding: 0 15px;");
+        ui->label_camStatus->setText("CAM: ONLINE");
+        ui->label_camStatus->setStyleSheet("color: #81C784; font-family: 'Consolas'; font-size: 11px; font-weight: bold; text-shadow: 0 0 3px #2E7D32, 0 0 6px #4CAF50, 0 0 10px #66BB6A;");
     }
     else
     {
-        statusLabel->setText("CAM: ○ OFFLINE");
-        statusLabel->setStyleSheet("color: #FF3C00; font-family: 'Consolas'; font-weight: bold; padding: 0 15px;");
+        statusLabel->setText("CAM: OFFLINE");
+        statusLabel->setStyleSheet("color: #FFCDD2; font-family: 'Consolas'; font-weight: bold; padding: 0 15px;");
+        ui->label_camStatus->setText("CAM: OFFLINE");
+        ui->label_camStatus->setStyleSheet("color: #FFCDD2; font-family: 'Consolas'; font-size: 11px; font-weight: bold; text-shadow: 0 0 3px #C62828, 0 0 6px #EF5350, 0 0 10px #E57373;");
+        ui->label_fps->setText("FPS: --");
+        ui->label_fps->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
+        ui->label_inferTime->setText("TIME: --ms");
+        ui->label_inferTime->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
+        ui->label_detCount->setText("DET: --");
+        ui->label_detCount->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
     }
 }
-// 指示灯颜色切换函数
-void MainWindow::setLedStatus(QLabel* led, bool online) {
-    // 荧光绿 vs 亮橙红
-    QString color = online ? "#00FFC2" : "#FF3C00";
-    // 阴影颜色
-    QString shadow = online ? "rgba(0, 255, 194, 0.4)" : "rgba(255, 60, 0, 0.4)";
 
-    led->setFixedSize(12, 12);
-    led->setStyleSheet(QString(
-                           "background-color: %1; "
-                           "border-radius: 6px; "
-                           "border: 1px solid rgba(255, 255, 255, 0.3); "
-                           ).arg(color));
-
-    // 给父级或自身添加简单的提示，增加交互感
-    led->setToolTip(online ? "LINK ACTIVE" : "LINK LOST");
+void MainWindow::setLedStatus(QLabel* led, bool online)
+{
+    if(online)
+    {
+        led->setText("●");
+        led->setStyleSheet("color: #8dffbf; font-weight: bold; font-size: 16px;");
+    }
+    else
+    {
+        led->setText("●");
+        led->setStyleSheet("color: #ff9fb1; font-weight: bold; font-size: 16px;");
+    }
 }
-void MainWindow::showAbout() {
+
+void MainWindow::showAbout()
+{
     QString info = QString("智能视觉监控系统\n\n"
-                           "软件版本: %1\n"
-                           "编译日期: %2\n"
-                           "技术支持: froduo")
+                           "版本: %1\n"
+                           "框架: YOLOv12 + TensorRT\n"
+                           "Qt: %2\n"
+                           "OpenCV: %3")
                        .arg(APP_VERSION_STR)
-                       .arg(__DATE__); // __DATE__ 是 C++ 内置宏，显示 Mmm dd yyyy 格式
+                       .arg(qVersion())
+                       .arg(CV_VERSION);
     QMessageBox::about(this, "关于", info);
 }
 
@@ -423,4 +428,3 @@ void MainWindow::on_actionversion_triggered()
 {
     showAbout();
 }
-

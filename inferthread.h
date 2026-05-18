@@ -1,3 +1,6 @@
+#ifndef INFERTHREAD_H
+#define INFERTHREAD_H
+
 #include <QThread>
 #include <QMutex>
 #include <QWaitCondition>
@@ -46,3 +49,5 @@ private:
 
     TrtLogger logger;   // ✅ 成员 logger（不是引用）
 };
+
+#endif // INFERTHREAD_H

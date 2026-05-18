@@ -24,8 +24,10 @@ void GrabThread::run()
         cv::Mat bgr;
         cv::cvtColor(img,bgr,cv::COLOR_GRAY2BGR);
 
-        emit sendFrame(bgr); // ❗不 clone
+        // ⭐ 必须 clone 后再释放，否则跨线程传递时数据已失效
+        cv::Mat frameClone = bgr.clone();
         m_camera->freeFrame(frame);
+        emit sendFrame(frameClone);
     }
 }
 
