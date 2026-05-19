@@ -25,7 +25,7 @@ InferThread::~InferThread()
     }
 }
 
-bool InferThread::setEngine(const QString &enginePath)
+bool InferThread::setEngine(const QString &enginePath, const QString &classesPath)
 {
     QFileInfo fi(enginePath);
     if (!fi.exists())
@@ -35,8 +35,10 @@ bool InferThread::setEngine(const QString &enginePath)
         return false;
     }
 
-    // ⭐ 日志：记录加载的模型路径
     LOG_INFO(QString("Loading TensorRT engine: %1").arg(enginePath));
+    if (!classesPath.isEmpty()) {
+        LOG_INFO(QString("Loading classes from: %1").arg(classesPath));
+    }
 
     try
     {
@@ -46,7 +48,7 @@ bool InferThread::setEngine(const QString &enginePath)
             yolo = nullptr;
         }
 
-        yolo = new TrtYolo(enginePath.toStdString(), logger);
+        yolo = new TrtYolo(enginePath.toStdString(), logger, classesPath.toStdString());
 
         LOG_INFO("TensorRT engine loaded successfully.");
         qDebug() << "TensorRT engine loaded successfully.";
@@ -58,6 +60,14 @@ bool InferThread::setEngine(const QString &enginePath)
         emit engineLoadFailed(QString("TensorRT init failed: %1").arg(e.what()));
         return false;
     }
+}
+
+bool InferThread::setClasses(const QString &classesPath)
+{
+    if (yolo) {
+        return yolo->loadClasses(classesPath.toStdString());
+    }
+    return false;
 }
 
 void InferThread::stop()

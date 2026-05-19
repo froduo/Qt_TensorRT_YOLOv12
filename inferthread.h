@@ -27,11 +27,12 @@ public:
     explicit InferThread(QObject *parent = nullptr);
     ~InferThread();
 
-    bool setEngine(const QString& enginePath);
+    bool setEngine(const QString& enginePath, const QString& classesPath = "");
+    bool setClasses(const QString& classesPath);
     void stop();
     void setFrame(const cv::Mat& frame);
 
-    void setScoreThreshold(float val) ;
+    void setScoreThreshold(float val);
 signals:
     void sendResult(QImage img, float inferTimeMs, float fps, std::vector<Detection> results);
     void engineLoadFailed(const QString& msg);

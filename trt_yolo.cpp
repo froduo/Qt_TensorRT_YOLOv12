@@ -10,10 +10,29 @@ static inline float sigmoid(float x)
     return 1.f / (1.f + expf(-x));
 }
 
-TrtYolo::TrtYolo(const std::string& enginePath, ILogger& logger)
+static const std::vector<std::string> defaultClassNames = {
+    "person","bicycle","car","motorcycle","airplane","bus","train","truck",
+    "boat","traffic light","fire hydrant","stop sign","parking meter","bench",
+    "bird","cat","dog","horse","sheep","cow","elephant","bear","zebra","giraffe",
+    "backpack","umbrella","handbag","tie","suitcase","frisbee","skis","snowboard",
+    "sports ball","kite","baseball bat","baseball glove","skateboard","surfboard",
+    "tennis racket","bottle","wine glass","cup","fork","knife","spoon","bowl",
+    "banana","apple","sandwich","orange","broccoli","carrot","hot dog","pizza",
+    "donut","cake","chair","couch","potted plant","bed","dining table","toilet",
+    "tv","laptop","mouse","remote","keyboard","cell phone","microwave","oven",
+    "toaster","sink","refrigerator","book","clock","vase","scissors","teddy bear",
+    "hair drier","toothbrush"
+};
+
+TrtYolo::TrtYolo(const std::string& enginePath, ILogger& logger, const std::string& classesPath)
     : logger(logger)
 {
     loadEngine(enginePath);
+    if (!classesPath.empty()) {
+        loadClasses(classesPath);
+    } else {
+        classNames = defaultClassNames;
+    }
 }
 
 TrtYolo::~TrtYolo()
@@ -256,6 +275,37 @@ void TrtYolo::postprocess(std::vector<Detection>& results)
     }
 }
 // draw 函数保持不变...
+bool TrtYolo::loadClasses(const std::string& classesPath)
+{
+    std::ifstream file(classesPath);
+    if (!file.is_open()) {
+        std::cerr << "[TrtYolo] Failed to open classes file: " << classesPath << std::endl;
+        return false;
+    }
+
+    classNames.clear();
+    std::string line;
+    while (std::getline(file, line)) {
+        size_t colonPos = line.find(':');
+        if (colonPos != std::string::npos) {
+            std::string className = line.substr(colonPos + 1);
+            className.erase(className.begin(), std::find_if(className.begin(), className.end(), [](unsigned char ch) {
+                return !std::isspace(ch);
+            }));
+            className.erase(std::find_if(className.rbegin(), className.rend(), [](unsigned char ch) {
+                return !std::isspace(ch);
+            }).base(), className.end());
+            if (!className.empty()) {
+                classNames.push_back(className);
+            }
+        }
+    }
+    file.close();
+
+    std::cout << "[TrtYolo] Loaded " << classNames.size() << " classes from: " << classesPath << std::endl;
+    return true;
+}
+
 void TrtYolo::draw(cv::Mat& img, const std::vector<Detection>& results)
 {
     for (const auto& d : results)
@@ -263,7 +313,8 @@ void TrtYolo::draw(cv::Mat& img, const std::vector<Detection>& results)
         cv::Rect box(d.x, d.y, d.w, d.h);
         cv::rectangle(img, box, cv::Scalar(0,255,0), 2);
 
-        std::string label = classNames[d.class_id] + cv::format(": %.2f", d.score);
+        std::string label = (d.class_id < classNames.size()) ? classNames[d.class_id] : "unknown";
+        label += cv::format(": %.2f", d.score);
 
         int baseline = 0;
         cv::Size textSize = cv::getTextSize(label,

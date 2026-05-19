@@ -11,6 +11,22 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    
+    QString stylePath = QCoreApplication::applicationDirPath() + "/style.qss";
+    QFile styleFile(stylePath);
+    if (!styleFile.exists()) {
+        stylePath = QCoreApplication::applicationDirPath() + "/../style.qss";
+        styleFile.setFileName(stylePath);
+    }
+    if (styleFile.open(QFile::ReadOnly)) {
+        QString styleSheet = QLatin1String(styleFile.readAll());
+        this->setStyleSheet(styleSheet);
+        styleFile.close();
+        LOG_INFO("Stylesheet loaded: " + stylePath);
+    } else {
+        LOG_WARN("Stylesheet not found: " + stylePath);
+    }
+    
     LOG_INFO("Software starting...");
     m_config.load();
     LOG_INFO("Config loaded.");
@@ -70,7 +86,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->statusbar->addPermanentWidget(statusLabel);
     ui->statusbar->addPermanentWidget(timeLabel);
 
-    ui->statusbar->setStyleSheet("QStatusBar { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #151d2e, stop:1 #0f172a); border-top: 1px solid #2e4a6a; }");
+    ui->statusbar->setStyleSheet("QStatusBar { background-color: #151d2e; border-top: 1px solid #2e4a6a; }");
 
     connect(inferThread, &InferThread::engineLoadFailed, this, &MainWindow::onEngineLoadFailed);
     connect(inferThread, &InferThread::sendResult, this, &MainWindow::updateImage);
@@ -98,23 +114,23 @@ MainWindow::MainWindow(QWidget *parent)
     setLedStatus(serialLed, false);
 
     LOG_INFO(QString("Loading TensorRT engine from config: %1").arg(m_config.enginePath));
-    if(!inferThread->setEngine(m_config.enginePath)) {
+    if(!inferThread->setEngine(m_config.enginePath, m_config.classesPath)) {
         LOG_WARN(QString("Config engine path failed, trying default: ./model/yolo12n_trt10_x86.engine"));
-        if(!inferThread->setEngine("./model/yolo12n_trt10_x86.engine")) {
+        if(!inferThread->setEngine("./model/yolo12n_trt10_x86.engine", "./model/coco.yaml")) {
             QTimer::singleShot(100, this, [=](){
                 QMessageBox::critical(this,"Error","Model load failed");
             });
             ui->label_model->setText("MODEL: FAILED");
-            ui->label_model->setStyleSheet("color: #FFCDD2; font-family: 'Consolas'; font-size: 11px; font-weight: 600; text-shadow: 0 0 3px #C62828, 0 0 6px #EF5350, 0 0 10px #E57373;");
+            ui->label_model->setStyleSheet("color: #FFCDD2; font-family: 'Consolas'; font-size: 11px; font-weight: 600;");
         } else {
             inferThread->start(QThread::HighPriority);
             ui->label_model->setText("MODEL: LOADED");
-            ui->label_model->setStyleSheet("color: #81C784; font-family: 'Consolas'; font-size: 11px; font-weight: 600; text-shadow: 0 0 3px #2E7D32, 0 0 6px #4CAF50, 0 0 10px #66BB6A;");
+            ui->label_model->setStyleSheet("color: #81C784; font-family: 'Consolas'; font-size: 11px; font-weight: 600;");
         }
     } else {
         inferThread->start(QThread::HighPriority);
         ui->label_model->setText("MODEL: LOADED");
-        ui->label_model->setStyleSheet("color: #81C784; font-family: 'Consolas'; font-size: 11px; font-weight: 600; text-shadow: 0 0 3px #2E7D32, 0 0 6px #4CAF50, 0 0 10px #66BB6A;");
+        ui->label_model->setStyleSheet("color: #81C784; font-family: 'Consolas'; font-size: 11px; font-weight: 600;");
     }
 
     sysTimer = new QTimer(this);
@@ -224,9 +240,9 @@ void MainWindow::onOpen()
     ui->btnClose->setEnabled(true);
 
     ui->label_exp->setText(QString("EXP: %1 us").arg(static_cast<int>(m_config.exposure)));
-    ui->label_exp->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
+    ui->label_exp->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500;");
     ui->label_gain->setText(QString("GAIN: %1").arg(m_config.gain));
-    ui->label_gain->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
+    ui->label_gain->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500;");
 }
 
 void MainWindow::onOpenImage()
@@ -279,11 +295,11 @@ void MainWindow::updateImage(QImage img, float inferTimeMs, float fps, std::vect
     m_imageView->setImage(img);
 
     ui->label_fps->setText(QString("FPS: %1").arg(QString::number(fps, 'f', 1)));
-    ui->label_fps->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
+    ui->label_fps->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
     ui->label_inferTime->setText(QString("TIME: %1ms").arg(QString::number(inferTimeMs, 'f', 1)));
-    ui->label_inferTime->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
+    ui->label_inferTime->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
     ui->label_detCount->setText(QString("DET: %1").arg(results.size()));
-    ui->label_detCount->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
+    ui->label_detCount->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
 
     if(!results.empty()) {
         networkMgr->sendDetectionResults(results);
@@ -314,7 +330,7 @@ void MainWindow::onEngineLoadFailed(QString msg)
     LOG_ERR("TensorRT Engine Load Failed: " + msg);
     QMessageBox::critical(this, "TensorRT Engine Error", msg);
     ui->label_model->setText("MODEL: FAILED");
-    ui->label_model->setStyleSheet("color: #FFCDD2; font-family: 'Consolas'; font-size: 11px; font-weight: 600; text-shadow: 0 0 3px #C62828, 0 0 6px #EF5350, 0 0 10px #E57373;");
+    ui->label_model->setStyleSheet("color: #FFCDD2; font-family: 'Consolas'; font-size: 11px; font-weight: 600;");
 }
 
 void MainWindow::onSetParams()
@@ -323,7 +339,8 @@ void MainWindow::onSetParams()
     int res = dlg.exec();
     if (res == QDialog::Accepted)
     {
-        QString oldPath = m_config.enginePath;
+        QString oldEnginePath = m_config.enginePath;
+        QString oldClassesPath = m_config.classesPath;
         m_config = dlg.getUpdatedConfig();
         m_config.save();
         LOG_INFO("System parameters updated and saved to config.ini");
@@ -332,9 +349,9 @@ void MainWindow::onSetParams()
             camera.setExposureTime(m_config.exposure);
             camera.setGain(m_config.gain);
             ui->label_exp->setText(QString("EXP: %1 us").arg(static_cast<int>(m_config.exposure)));
-            ui->label_exp->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
-            ui->label_gain->setText(QString("GAIN: %1").arg(m_config.gain));
-            ui->label_gain->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
+        ui->label_exp->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500;");
+        ui->label_gain->setText(QString("GAIN: %1").arg(m_config.gain));
+        ui->label_gain->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500;");
         }
 
         serialMgr->closePort();
@@ -343,18 +360,21 @@ void MainWindow::onSetParams()
         networkMgr->disconnect();
         networkMgr->connectToServer(m_config.netIp, m_config.netPort);
 
-        if (oldPath != m_config.enginePath) {
+        if (oldEnginePath != m_config.enginePath) {
             inferThread->stop();
             inferThread->wait();
-            if(inferThread->setEngine(m_config.enginePath)) {
+            if(inferThread->setEngine(m_config.enginePath, m_config.classesPath)) {
                 inferThread->start();
                 ui->statusbar->showMessage("推理引擎已重新加载", 3000);
                 ui->label_model->setText("MODEL: LOADED");
-                ui->label_model->setStyleSheet("color: #81C784; font-family: 'Consolas'; font-size: 11px; font-weight: 600; text-shadow: 0 0 3px #2E7D32, 0 0 6px #4CAF50, 0 0 10px #66BB6A;");
+                ui->label_model->setStyleSheet("color: #81C784; font-family: 'Consolas'; font-size: 11px; font-weight: 600;");
             } else {
                 ui->label_model->setText("MODEL: FAILED");
-                ui->label_model->setStyleSheet("color: #FFCDD2; font-family: 'Consolas'; font-size: 11px; font-weight: 600; text-shadow: 0 0 3px #C62828, 0 0 6px #EF5350, 0 0 10px #E57373;");
+                ui->label_model->setStyleSheet("color: #FFCDD2; font-family: 'Consolas'; font-size: 11px; font-weight: 600;");
             }
+        } else if (oldClassesPath != m_config.classesPath) {
+            inferThread->setClasses(m_config.classesPath);
+            ui->statusbar->showMessage("类别配置已更新", 3000);
         }
         inferThread->setScoreThreshold(m_config.scoreThreshold);
         QMessageBox::information(this, "成功", "参数已保存并实时应用");
@@ -380,20 +400,20 @@ void MainWindow::updateCameraStatus(bool connected)
         statusLabel->setText("CAM: ONLINE");
         statusLabel->setStyleSheet("color: #8dffbf; font-family: 'Consolas'; font-weight: bold; padding: 0 15px;");
         ui->label_camStatus->setText("CAM: ONLINE");
-        ui->label_camStatus->setStyleSheet("color: #81C784; font-family: 'Consolas'; font-size: 11px; font-weight: bold; text-shadow: 0 0 3px #2E7D32, 0 0 6px #4CAF50, 0 0 10px #66BB6A;");
+        ui->label_camStatus->setStyleSheet("color: #81C784; font-family: 'Consolas'; font-size: 11px; font-weight: bold;");
     }
     else
     {
         statusLabel->setText("CAM: OFFLINE");
         statusLabel->setStyleSheet("color: #FFCDD2; font-family: 'Consolas'; font-weight: bold; padding: 0 15px;");
         ui->label_camStatus->setText("CAM: OFFLINE");
-        ui->label_camStatus->setStyleSheet("color: #FFCDD2; font-family: 'Consolas'; font-size: 11px; font-weight: bold; text-shadow: 0 0 3px #C62828, 0 0 6px #EF5350, 0 0 10px #E57373;");
+        ui->label_camStatus->setStyleSheet("color: #FFCDD2; font-family: 'Consolas'; font-size: 11px; font-weight: bold;");
         ui->label_fps->setText("FPS: --");
-        ui->label_fps->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
+        ui->label_fps->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
         ui->label_inferTime->setText("TIME: --ms");
-        ui->label_inferTime->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
+        ui->label_inferTime->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
         ui->label_detCount->setText("DET: --");
-        ui->label_detCount->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;");
+        ui->label_detCount->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
     }
 }
 

@@ -14,212 +14,6 @@
    <string>YOLOv12 智能视觉监控核心</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">
-    QMainWindow {
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0a0e1a, stop:1 #141b2d);
-        color: #eef4ff;
-    }
-    QWidget#centralwidget { background: transparent; }
-    QGraphicsView#imageView {
-        background-color: #050812;
-        border: 2px solid #4a6fa5;
-        border-radius: 12px;
-        padding: 4px;
-    }
-    QPushButton {
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #3a7bc8, stop:1 #2b5fba);
-        border: 1px solid #5a9be8;
-        border-radius: 8px;
-        color: #ffffff;
-        padding: 10px 16px;
-        font-family: 'Microsoft YaHei', 'PingFang SC';
-        font-weight: 600;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        min-height: 38px;
-    }
-    QPushButton:hover {
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #4a8bd8, stop:1 #3a7bc8);
-        border-color: #7ab8f5;
-    }
-    QPushButton:pressed {
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1e4a96, stop:1 #255aab);
-    }
-    QPushButton:disabled {
-        background: #2a3545;
-        border-color: #3a4555;
-        color: #6a7a8a;
-    }
-    QPushButton#btnClose {
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #6b2a35, stop:1 #4a1620);
-        border-color: #c04a63;
-        color: #ff9fb1;
-    }
-    QPushButton#btnClose:hover {
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #7b3a45, stop:1 #5d1e2b);
-        border-color: #d05a73;
-    }
-    QStatusBar {
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #151d2e, stop:1 #0f172a);
-        color: #e8f2ff;
-        border-top: 1px solid #2e4a6a;
-    }
-    QMenuBar {
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0d1525, stop:1 #080d18);
-        color: #a8d4ff;
-        border-bottom: 1px solid #1e3a5f;
-        font-family: 'Microsoft YaHei', 'PingFang SC';
-        font-size: 13px;
-        letter-spacing: 0.5px;
-    }
-    QMenuBar::item { 
-        padding: 6px 20px; 
-        margin: 0 4px;
-        border-radius: 4px;
-        transition: all 0.3s ease;
-    }
-    QMenuBar::item:selected { 
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #3a7bc8, stop:1 #2b5fba); 
-        color: #ffffff; 
-        box-shadow: 0 2px 8px rgba(58, 123, 200, 0.3);
-    }
-    QMenuBar::item:pressed { 
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1e4a96, stop:1 #153a7a); 
-    }
-    QMenu { 
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #121d35, stop:1 #0a1225); 
-        color: #e8f2ff; 
-        border: 1px solid #2e4a6a; 
-        border-radius: 8px;
-        padding: 6px 0;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(74, 106, 165, 0.2);
-    }
-    QMenu::item { 
-        padding: 10px 36px 10px 28px; 
-        margin: 2px 6px;
-        border-radius: 6px;
-        transition: all 0.25s ease;
-        font-family: 'Microsoft YaHei', 'PingFang SC';
-        font-size: 13px;
-    }
-    QMenu::item:selected { 
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #3a7bc8, stop:1 #2b5fba); 
-        color: #ffffff; 
-        padding-left: 32px;
-        box-shadow: inset 0 0 15px rgba(58, 123, 200, 0.3);
-    }
-    QMenu::item:hover { 
-        background: rgba(58, 123, 200, 0.15);
-        color: #87ceeb;
-    }
-    QMenu::separator {
-        height: 1px;
-        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 transparent, stop:0.3 #3a5a8a, stop:0.7 #3a5a8a, stop:1 transparent);
-        margin: 6px 8px;
-    }
-    QMenu::icon {
-        width: 16px;
-        height: 16px;
-    }
-    QMenu::indicator {
-        width: 16px;
-        height: 16px;
-        margin-right: 8px;
-    }
-    QMenu::indicator:non-exclusive:unchecked {
-        image: none;
-    }
-    QMenu::indicator:non-exclusive:checked {
-        image: url(data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2358a8ff' d='M2 6L5 9l7-5-1.4-1.4L5 6.2 3.4 4.6z'/%3E%3C/svg%3E);
-    }
-    QLabel { color: #eaf2ff; }
-    QFrame#controlPanel {
-        background: rgba(15, 25, 45, 0.9);
-        border: 1px solid #2e4a6a;
-        border-radius: 10px;
-    }
-    QGroupBox {
-        background: rgba(10, 15, 30, 0.85);
-        border: 1px solid #2e4a6a;
-        border-radius: 8px;
-        color: #7ad7ff;
-        font-weight: bold;
-        font-size: 11px;
-        letter-spacing: 1.5px;
-        padding-top: 8px;
-        margin-top: 6px;
-    }
-    QGroupBox::title {
-        subcontrol-origin: margin;
-        left: 8px;
-        padding: 0 6px;
-        color: #58a8ff;
-        font-size: 10px;
-    }
-    QMessageBox {
-        background-color: #0f1828;
-        border: 1px solid #2e4a6a;
-        border-radius: 8px;
-    }
-    QMessageBox QLabel {
-        color: #eaf2ff;
-        background: transparent;
-        font-size: 14px;
-        font-family: 'Microsoft YaHei', 'PingFang SC';
-    }
-    QMessageBox QPushButton {
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #3a7bc8, stop:1 #2b5fba);
-        border: 1px solid #5a9be8;
-        border-radius: 6px;
-        color: #ffffff;
-        padding: 8px 24px;
-        font-size: 13px;
-        min-width: 80px;
-    }
-    QMessageBox QPushButton:hover {
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #4a8bd8, stop:1 #3a7bc8);
-        border-color: #7ab8f5;
-    }
-    QDialog {
-        background-color: #0f1828;
-        border: 1px solid #2e4a6a;
-        border-radius: 8px;
-    }
-    QDialog QLabel { color: #eaf2ff; background: transparent; }
-    QDialog QPushButton {
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #3a7bc8, stop:1 #2b5fba);
-        border: 1px solid #5a9be8;
-        border-radius: 6px;
-        color: #ffffff;
-        padding: 8px 20px;
-        font-size: 13px;
-    }
-    QFileDialog {
-        background-color: #0f1828;
-        border: 1px solid #2e4a6a;
-    }
-    QFileDialog QLabel { color: #eaf2ff; }
-    QFileDialog QPushButton {
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #3a7bc8, stop:1 #2b5fba);
-        border: 1px solid #5a9be8;
-        border-radius: 6px;
-        color: #ffffff;
-    }
-    QFileDialog QLineEdit {
-        background-color: #1a2540;
-        border: 1px solid #3a5a8a;
-        color: #eaf2ff;
-        border-radius: 4px;
-        padding: 4px;
-    }
-    QFileDialog QListWidget {
-        background-color: #1a2540;
-        border: 1px solid #3a5a8a;
-        color: #eaf2ff;
-    }
-    QFileDialog QListWidget::item:selected { background-color: #2f62bb; }
-   </string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="horizontalLayout" stretch="8,2">
@@ -270,19 +64,19 @@
       </property>
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <property name="spacing">
-        <number>10</number>
+        <number>12</number>
        </property>
        <property name="leftMargin">
-        <number>15</number>
+        <number>12</number>
        </property>
        <property name="topMargin">
-        <number>15</number>
+        <number>12</number>
        </property>
        <property name="rightMargin">
-        <number>15</number>
+        <number>12</number>
        </property>
        <property name="bottomMargin">
-        <number>15</number>
+        <number>12</number>
        </property>
        <item>
         <widget class="QLabel" name="label_title">
@@ -327,31 +121,31 @@
        <item>
         <widget class="QGroupBox" name="groupBox_infer">
          <property name="styleSheet">
-          <string notr="true">QGroupBox { border: 2px solid #6B8E78; border-radius: 8px; background: rgba(107, 142, 120, 0.08); } QGroupBox::title { color: #8FA397; font-family: 'Consolas'; font-size: 11px; font-weight: bold; text-shadow: 0 0 4px #4A6B5A, 0 0 8px #6B8E78; padding-left: 8px; padding-right: 8px; }</string>
+          <string notr="true">QGroupBox { border: 2px solid #6B8E78; border-radius: 8px; margin-top: 12px; } QGroupBox::title { color: #8FA397; font-family: 'Consolas'; font-size: 11px; font-weight: bold; subcontrol-origin: margin; left: 10px; padding: 0 6px; top: -6px; }</string>
          </property>
          <property name="title">
           <string>INFERENCE</string>
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_4">
           <property name="spacing">
-           <number>5</number>
+           <number>8</number>
           </property>
           <property name="leftMargin">
-           <number>10</number>
+           <number>14</number>
           </property>
           <property name="topMargin">
-           <number>8</number>
+           <number>16</number>
           </property>
           <property name="rightMargin">
-           <number>10</number>
+           <number>14</number>
           </property>
           <property name="bottomMargin">
-           <number>8</number>
+           <number>12</number>
           </property>
           <item>
            <widget class="QLabel" name="label_fps">
             <property name="styleSheet">
-             <string notr="true">color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;</string>
+             <string notr="true">color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;</string>
             </property>
             <property name="text">
              <string>FPS: --</string>
@@ -361,7 +155,7 @@
           <item>
            <widget class="QLabel" name="label_inferTime">
             <property name="styleSheet">
-             <string notr="true">color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;</string>
+             <string notr="true">color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;</string>
             </property>
             <property name="text">
              <string>TIME: --ms</string>
@@ -371,7 +165,7 @@
           <item>
            <widget class="QLabel" name="label_detCount">
             <property name="styleSheet">
-             <string notr="true">color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;</string>
+             <string notr="true">color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;</string>
             </property>
             <property name="text">
              <string>DET: --</string>
@@ -384,31 +178,31 @@
        <item>
         <widget class="QGroupBox" name="groupBox_camera">
          <property name="styleSheet">
-          <string notr="true">QGroupBox { border: 2px solid #6B8E78; border-radius: 8px; background: rgba(107, 142, 120, 0.08); } QGroupBox::title { color: #8FA397; font-family: 'Consolas'; font-size: 11px; font-weight: bold; text-shadow: 0 0 4px #4A6B5A, 0 0 8px #6B8E78; padding-left: 8px; padding-right: 8px; }</string>
+          <string notr="true">QGroupBox { border: 2px solid #6B8E78; border-radius: 8px; margin-top: 12px; } QGroupBox::title { color: #8FA397; font-family: 'Consolas'; font-size: 11px; font-weight: bold; subcontrol-origin: margin; left: 10px; padding: 0 6px; top: -6px; }</string>
          </property>
          <property name="title">
           <string>CAMERA</string>
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_5">
           <property name="spacing">
-           <number>5</number>
+           <number>8</number>
           </property>
           <property name="leftMargin">
-           <number>10</number>
+           <number>14</number>
           </property>
           <property name="topMargin">
-           <number>8</number>
+           <number>16</number>
           </property>
           <property name="rightMargin">
-           <number>10</number>
+           <number>14</number>
           </property>
           <property name="bottomMargin">
-           <number>8</number>
+           <number>12</number>
           </property>
           <item>
            <widget class="QLabel" name="label_exp">
             <property name="styleSheet">
-             <string notr="true">color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;</string>
+             <string notr="true">color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500;</string>
             </property>
             <property name="text">
              <string>EXP: -- us</string>
@@ -418,7 +212,7 @@
           <item>
            <widget class="QLabel" name="label_gain">
             <property name="styleSheet">
-             <string notr="true">color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;</string>
+             <string notr="true">color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500;</string>
             </property>
             <property name="text">
              <string>GAIN: --</string>
@@ -431,31 +225,31 @@
        <item>
         <widget class="QGroupBox" name="groupBox_status">
          <property name="styleSheet">
-          <string notr="true">QGroupBox { border: 2px solid #6B8E78; border-radius: 8px; background: rgba(107, 142, 120, 0.08); } QGroupBox::title { color: #8FA397; font-family: 'Consolas'; font-size: 11px; font-weight: bold; text-shadow: 0 0 4px #4A6B5A, 0 0 8px #6B8E78; padding-left: 8px; padding-right: 8px; }</string>
+          <string notr="true">QGroupBox { border: 2px solid #6B8E78; border-radius: 8px; margin-top: 12px; } QGroupBox::title { color: #8FA397; font-family: 'Consolas'; font-size: 11px; font-weight: bold; subcontrol-origin: margin; left: 10px; padding: 0 6px; top: -6px; }</string>
          </property>
          <property name="title">
           <string>STATUS</string>
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_6">
           <property name="spacing">
-           <number>5</number>
+           <number>8</number>
           </property>
           <property name="leftMargin">
-           <number>10</number>
+           <number>14</number>
           </property>
           <property name="topMargin">
-           <number>8</number>
+           <number>16</number>
           </property>
           <property name="rightMargin">
-           <number>10</number>
+           <number>14</number>
           </property>
           <property name="bottomMargin">
-           <number>8</number>
+           <number>12</number>
           </property>
           <item>
            <widget class="QLabel" name="label_camStatus">
             <property name="styleSheet">
-             <string notr="true">color: #FFCDD2; font-family: 'Consolas'; font-size: 11px; font-weight: 600; text-shadow: 0 0 3px #C62828, 0 0 6px #EF5350, 0 0 10px #E57373;</string>
+             <string notr="true">color: #FFCDD2; font-family: 'Consolas'; font-size: 11px; font-weight: 600;</string>
             </property>
             <property name="text">
              <string>CAM: OFFLINE</string>
@@ -465,7 +259,7 @@
           <item>
            <widget class="QLabel" name="label_model">
             <property name="styleSheet">
-             <string notr="true">color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 600; text-shadow: 0 0 3px #4CAF50, 0 0 6px #81C784, 0 0 10px #66BB6A;</string>
+             <string notr="true">color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 600;</string>
             </property>
             <property name="text">
              <string>MODEL: --</string>

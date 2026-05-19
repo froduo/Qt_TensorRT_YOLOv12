@@ -16,32 +16,19 @@ struct Detection
     int w;
     int h;
 };
-static const std::vector<std::string> classNames = {
-    "person","bicycle","car","motorcycle","airplane","bus","train","truck",
-    "boat","traffic light","fire hydrant","stop sign","parking meter","bench",
-    "bird","cat","dog","horse","sheep","cow","elephant","bear","zebra","giraffe",
-    "backpack","umbrella","handbag","tie","suitcase","frisbee","skis","snowboard",
-    "sports ball","kite","baseball bat","baseball glove","skateboard","surfboard",
-    "tennis racket","bottle","wine glass","cup","fork","knife","spoon","bowl",
-    "banana","apple","sandwich","orange","broccoli","carrot","hot dog","pizza",
-    "donut","cake","chair","couch","potted plant","bed","dining table","toilet",
-    "tv","laptop","mouse","remote","keyboard","cell phone","microwave","oven",
-    "toaster","sink","refrigerator","book","clock","vase","scissors","teddy bear",
-    "hair drier","toothbrush"
-};
-
-
 class TrtYolo
 {
 public:
-    TrtYolo(const std::string& enginePath, nvinfer1::ILogger& logger);
+    TrtYolo(const std::string& enginePath, nvinfer1::ILogger& logger, const std::string& classesPath = "");
     ~TrtYolo();
+    bool loadClasses(const std::string& classesPath);
 
     void preprocess(const cv::Mat& img);
     void infer();
     void postprocess(std::vector<Detection>& results);
     void draw(cv::Mat& img, const std::vector<Detection>& results);
-    float confThreshold = 0.25f; // 增加成员变量
+    float confThreshold = 0.25f;
+    std::vector<std::string> classNames;
 private:
     bool loadEngine(const std::string& enginePath);
     size_t getSizeByDim(const nvinfer1::Dims& dims);

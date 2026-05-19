@@ -1,0 +1,175 @@
+QMainWindow {
+    background-color: #0a0e1a;
+    color: #eef4ff;
+}
+
+QWidget#centralwidget {
+    background: transparent;
+}
+
+QGraphicsView#imageView {
+    background-color: #050812;
+    border: 2px solid #4a6fa5;
+    border-radius: 12px;
+    padding: 4px;
+}
+
+QPushButton {
+    background-color: #3a7bc8;
+    border: 1px solid #5a9be8;
+    border-radius: 8px;
+    color: #ffffff;
+    padding: 10px 16px;
+    font-weight: 600;
+    font-size: 12px;
+    min-height: 38px;
+}
+
+QPushButton:hover {
+    background-color: #4a8bd8;
+    border-color: #7ab8f5;
+}
+
+QPushButton:pressed {
+    background-color: #1e4a96;
+}
+
+QPushButton:disabled {
+    background-color: #2a3545;
+    border-color: #3a4555;
+    color: #6a7a8a;
+}
+
+QPushButton#btnClose {
+    background-color: #6b2a35;
+    border-color: #c04a63;
+    color: #ff9fb1;
+}
+
+QPushButton#btnClose:hover {
+    background-color: #7b3a45;
+    border-color: #d05a73;
+}
+
+QStatusBar {
+    background-color: #151d2e;
+    color: #e8f2ff;
+    border-top: 1px solid #2e4a6a;
+}
+
+QMenuBar {
+    background-color: #0d1525;
+    color: #a8d4ff;
+    border-bottom: 1px solid #1e3a5f;
+    font-size: 13px;
+}
+
+QMenuBar::item {
+    padding: 6px 20px;
+    margin: 0 4px;
+    border-radius: 4px;
+}
+
+QMenuBar::item:selected {
+    background-color: #3a7bc8;
+    color: #ffffff;
+}
+
+QMenuBar::item:pressed {
+    background-color: #1e4a96;
+}
+
+QMenu {
+    background-color: #121d35;
+    color: #e8f2ff;
+    border: 1px solid #2e4a6a;
+    border-radius: 8px;
+    padding: 6px 0;
+}
+
+QMenu::item {
+    padding: 10px 36px 10px 28px;
+    margin: 2px 6px;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+QMenu::item:selected {
+    background-color: #3a7bc8;
+    color: #ffffff;
+    padding-left: 32px;
+}
+
+QMenu::separator {
+    height: 1px;
+    background-color: #3a5a8a;
+    margin: 6px 8px;
+}
+
+QDialog {
+    background-color: #0f1828;
+    border: 1px solid #2e4a6a;
+    border-radius: 10px;
+}
+
+QDialog QLabel {
+    color: #eaf2ff;
+}
+
+QDialog QPushButton {
+    background-color: #3a7bc8;
+    border: 1px solid #5a9be8;
+    border-radius: 6px;
+    color: #ffffff;
+}
+
+QMessageBox {
+    background-color: #0f1828;
+    border: 1px solid #2e4a6a;
+    border-radius: 8px;
+}
+
+QMessageBox QLabel {
+    color: #eaf2ff;
+}
+
+QMessageBox QPushButton {
+    background-color: #3a7bc8;
+    border: 1px solid #5a9be8;
+    border-radius: 6px;
+    color: #ffffff;
+}
+
+QFileDialog {
+    background-color: #0f1828;
+    border: 1px solid #2e4a6a;
+}
+
+QFileDialog QLabel {
+    color: #eaf2ff;
+}
+
+QFileDialog QPushButton {
+    background-color: #3a7bc8;
+    border: 1px solid #5a9be8;
+    border-radius: 6px;
+    color: #ffffff;
+}
+
+QFileDialog QLineEdit {
+    background-color: #1a2540;
+    border: 1px solid #3a5a8a;
+    color: #eaf2ff;
+    border-radius: 4px;
+    padding: 4px;
+}
+
+QFileDialog QListWidget {
+    background-color: #1a2540;
+    border: 1px solid #3a5a8a;
+    color: #eaf2ff;
+}
+
+QFileDialog QListWidget::item:selected {
+    background-color: #2f62bb;
+}
