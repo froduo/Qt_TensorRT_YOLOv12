@@ -72,8 +72,15 @@ MainWindow::MainWindow(QWidget *parent)
     statusLabel = new QLabel("CAM: OFFLINE", this);
     statusLabel->setStyleSheet("color: #ff9fb1; font-family: 'Consolas'; font-weight: bold; padding: 0 15px;");
 
+    // 运行时长标签（左下角）
+    runTimeLabel = new QLabel("RUN: 00:00:00", this);
+    runTimeLabel->setStyleSheet("color: #ffd54f; font-family: 'Consolas'; font-size: 13px; font-weight: bold; padding: 0 10px; border-right: 1px solid #2e3a51;");
+
     timeLabel = new QLabel(this);
     timeLabel->setStyleSheet("color: #7ad7ff; font-family: 'Consolas'; font-size: 14px; padding: 0 10px; border-left: 1px solid #2e3a51;");
+
+    // 运行时长放在状态栏最左侧（先添加的靠左）
+    ui->statusbar->addPermanentWidget(runTimeLabel);
 
     ui->statusbar->addPermanentWidget(netTitle);
     ui->statusbar->addPermanentWidget(netLed);
@@ -132,6 +139,9 @@ MainWindow::MainWindow(QWidget *parent)
         ui->label_model->setText("MODEL: LOADED");
         ui->label_model->setStyleSheet("color: #81C784; font-family: 'Consolas'; font-size: 11px; font-weight: 600;");
     }
+
+    // 启动运行计时器
+    m_elapsedTimer.start();
 
     sysTimer = new QTimer(this);
     connect(sysTimer, &QTimer::timeout, this, &MainWindow::onUpdateSystemTime);
@@ -389,8 +399,19 @@ void MainWindow::openOfflineVerify()
 
 void MainWindow::onUpdateSystemTime()
 {
+    // 更新系统时间
     QString currentTime = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
     timeLabel->setText(currentTime);
+
+    // 更新运行时长
+    qint64 elapsedMs = m_elapsedTimer.elapsed();
+    int hours   = static_cast<int>(elapsedMs / 3600000);
+    int minutes = static_cast<int>((elapsedMs % 3600000) / 60000);
+    int seconds = static_cast<int>((elapsedMs % 60000) / 1000);
+    runTimeLabel->setText(QString("RUN: %1:%2:%3")
+                              .arg(hours, 2, 10, QChar('0'))
+                              .arg(minutes, 2, 10, QChar('0'))
+                              .arg(seconds, 2, 10, QChar('0')));
 }
 
 void MainWindow::updateCameraStatus(bool connected)

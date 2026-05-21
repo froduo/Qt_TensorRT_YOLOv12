@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QLabel>
 #include <QPushButton>
+#include <QElapsedTimer>
 #include "cameracontroller.h"
 #include "grabthread.h"
 #include "inferthread.h"
@@ -48,7 +49,9 @@ private:
 
     QLabel *statusLabel;    // 相机状态标签
     QLabel *timeLabel;      // 时间显示标签
+    QLabel *runTimeLabel;   // 运行时长标签
     QTimer *sysTimer;       // 系统时钟定时器
+    QElapsedTimer m_elapsedTimer; // 运行计时器
 
     void updateCameraStatus(bool connected); // 封装状态更新逻辑
     // private 变量增加
