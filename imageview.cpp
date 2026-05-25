@@ -1,4 +1,5 @@
 #include "imageview.h"
+#include "logger.h"
 
 #include <QMouseEvent>
 #include <QScrollBar>
@@ -25,12 +26,24 @@ ImageView::ImageView(QWidget* parent)
 
 void ImageView::setImage(const QImage& image)
 {
-    if (image.isNull()) return;
-    m_item->setPixmap(QPixmap::fromImage(image));
+    if (image.isNull()) {
+        LOG_WARN("[ImageView] setImage received null image");
+        return;
+    }
+
+    // ⭐ 优化：使用 QPixmap 缓存，避免频繁 fromImage 转换
+    if (m_cachedPixmap.isNull() || m_cachedPixmap.size() != image.size()) {
+        m_cachedPixmap = QPixmap::fromImage(image);
+    } else {
+        m_cachedPixmap.convertFromImage(image);
+    }
+
+    m_item->setPixmap(m_cachedPixmap);
     m_scene->setSceneRect(m_item->boundingRect());
     
     if (!m_hasImage) {
         m_hasImage = true;
+        LOG_INFO(QString("[ImageView] First image set: %1x%2").arg(image.width()).arg(image.height()));
         fitImageInView();
     }
 }

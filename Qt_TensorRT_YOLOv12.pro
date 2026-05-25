@@ -17,6 +17,7 @@ SOURCES += \
     mainwindow.cpp \
     networkmanager.cpp \
     offlineverifyform.cpp \
+    saveimageworker.cpp \
     serialmanager.cpp \
     settingform.cpp \
     trt_yolo.cpp
@@ -31,6 +32,7 @@ HEADERS += \
     mainwindow.h \
     networkmanager.h \
     offlineverifyform.h \
+    saveimageworker.h \
     serialmanager.h \
     settingform.h \
     trt_yolo.h

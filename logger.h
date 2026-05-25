@@ -42,17 +42,27 @@ public:
             out.flush();
         }
     }
-    // 在 Logger 构造函数中加入
+    // ⭐ 清理超过30天的旧日志文件
     void cleanOldLogs() {
         QDir dir("logs");
+        if (!dir.exists()) return;
+
         dir.setFilter(QDir::Files | QDir::NoSymLinks);
+        dir.setNameFilters(QStringList() << "run_log_*.txt");
         QFileInfoList list = dir.entryInfoList();
-        QDateTime limit = QDateTime::currentDateTime().addDays(-7); // 保留7天
+        QDateTime limit = QDateTime::currentDateTime().addDays(-14); // 保留14天
+        int removedCount = 0;
 
         for (int i = 0; i < list.size(); ++i) {
             if (list.at(i).lastModified() < limit) {
-                QFile::remove(list.at(i).absoluteFilePath());
+                if (QFile::remove(list.at(i).absoluteFilePath())) {
+                    removedCount++;
+                }
             }
+        }
+
+        if (removedCount > 0) {
+            qDebug() << "[Logger] Cleaned up" << removedCount << "old log files (older than 30 days)";
         }
     }
 
@@ -62,6 +72,9 @@ private:
         if (!logDir.exists("logs")) {
             logDir.mkdir("logs");
         }
+        // ⭐ 启动时自动清理超过30天的旧日志
+        cleanOldLogs();
+
         QString fileName = QString("logs/run_log_%1.txt")
                                .arg(QDateTime::currentDateTime().toString("yyyyMMdd"));
         logFile.setFileName(fileName);

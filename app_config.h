@@ -20,6 +20,16 @@ struct AppConfig {
     QString netIp = "192.168.200.172";
     int netPort = 8080;
 
+    // 主界面标题
+    QString windowTitle = "AI智能检测系统";
+
+    // 图像保存参数
+    bool saveNG = false;          // 检测到物体时保存到NG文件夹
+    bool saveOK = false;          // 未检测到物体时保存到OK文件夹
+    QString savePath = "./save_images"; // 保存根路径
+    QString saveFormat = "jpg";   // 保存格式: jpg/bmp/tif
+    int jpegQuality = 95;         // JPEG压缩质量 1-100
+
     // 推理参数
     double scoreThreshold = 0.25; // 默认得分阈值
     QString enginePath = "./model/yolo12n_trt10_x86.engine"; // 新增推理路径
@@ -45,6 +55,18 @@ struct AppConfig {
         s.setValue("Port", netPort);
         s.endGroup();
 
+        s.beginGroup("Display");
+        s.setValue("WindowTitle", windowTitle);
+        s.endGroup();
+
+        s.beginGroup("ImageSave");
+        s.setValue("SaveNG", saveNG);
+        s.setValue("SaveOK", saveOK);
+        s.setValue("SavePath", savePath);
+        s.setValue("SaveFormat", saveFormat);
+        s.setValue("JpegQuality", jpegQuality);
+        s.endGroup();
+
         s.beginGroup("Inference");
         s.setValue("ScoreThreshold", scoreThreshold);
         s.setValue("EnginePath", enginePath); // 保存路径
@@ -65,6 +87,14 @@ struct AppConfig {
 
         netIp = s.value("Network/IP", "192.168.200.172").toString();
         netPort = s.value("Network/Port", 8080).toInt();
+
+        windowTitle = s.value("Display/WindowTitle", "AI智能检测系统").toString();
+
+        saveNG = s.value("ImageSave/SaveNG", false).toBool();
+        saveOK = s.value("ImageSave/SaveOK", false).toBool();
+        savePath = s.value("ImageSave/SavePath", "./save_images").toString();
+        saveFormat = s.value("ImageSave/SaveFormat", "jpg").toString();
+        jpegQuality = s.value("ImageSave/JpegQuality", 95).toInt();
 
         enginePath = s.value("Inference/EnginePath", "./model/yolo12n_trt10_x86.engine").toString();
         scoreThreshold = s.value("Inference/ScoreThreshold", 0.25).toDouble();

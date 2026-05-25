@@ -2,6 +2,7 @@
 #define GRABTHREAD_H
 
 #include <QThread>
+#include <QElapsedTimer>
 #include <opencv2/opencv.hpp>
 #include "cameracontroller.h"
 
@@ -14,6 +15,7 @@ public:
 
 signals:
     void sendFrame(cv::Mat frame);
+    void deviceLost();  // ⭐ 检测到相机掉线
 
 protected:
     void run() override;
@@ -21,6 +23,8 @@ protected:
 private:
     bool m_running;
     CameraController* m_camera;
+    int m_consecutiveFailCount{0};       // ⭐ 连续获取失败计数
+    static const int MAX_FAIL_COUNT = 300; // ⭐ 连续失败阈值（约15秒，每次失败sleep 50ms）
 };
 
 #endif

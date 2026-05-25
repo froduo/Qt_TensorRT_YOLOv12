@@ -5,6 +5,7 @@
 #include <QGraphicsScene>
 #include <QGraphicsView>
 #include <QImage>
+#include <QPixmap>
 
 class ImageView : public QGraphicsView
 {
@@ -33,6 +34,7 @@ private:
     bool m_hasImage {false};
     double m_zoomFactor {1.0};
     double m_fitZoomFactor {1.0};
+    QPixmap m_cachedPixmap;  // ⭐ 缓存 QPixmap，减少重复创建开销
 };
 
 #endif

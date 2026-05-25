@@ -106,6 +106,50 @@ bool CameraController::setExposureTime(float exposureTimeUs)
     return true;
 }
 
+void CameraController::setTargetSN(const QString& sn)
+{
+    m_targetSN = sn;
+}
+
+bool CameraController::reconnect()
+{
+    // 1. 关闭当前设备（如果有）
+    closeCamera();
+
+    // 2. 重新枚举设备
+    std::vector<MV_CC_DEVICE_INFO*> devList;
+    if (!enumDevices(devList) || devList.empty()) {
+        return false;
+    }
+
+    // 3. 按序列号查找目标相机
+    m_targetIndex = -1;
+    for (size_t i = 0; i < devList.size(); ++i) {
+        QString sn = QString((char*)devList[i]->SpecialInfo.stGigEInfo.chSerialNumber);
+        if (sn == m_targetSN) {
+            m_targetIndex = static_cast<int>(i);
+            break;
+        }
+    }
+    if (m_targetIndex < 0) {
+        // 没找到指定序列号，尝试第一个设备
+        m_targetIndex = 0;
+    }
+
+    // 4. 打开相机
+    if (!openCamera(m_targetIndex)) {
+        return false;
+    }
+
+    // 5. 开始抓取
+    if (!startGrabbing()) {
+        closeCamera();
+        return false;
+    }
+
+    return true;
+}
+
 // ⭐ 设置增益 (传入参数单位通常是 dB)
 bool CameraController::setGain(float gain)
 {

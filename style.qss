@@ -116,6 +116,33 @@ QDialog QLabel {
     color: #eaf2ff;
 }
 
+/* 对话框内复选框样式 - 亮色文本便于深色背景查看 */
+QDialog QCheckBox {
+    color: #b8d4ff;
+    font-family: 'Consolas';
+    font-size: 12px;
+    font-weight: 600;
+    spacing: 6px;
+}
+
+QDialog QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #5a8abe;
+    border-radius: 3px;
+    background-color: #1a2540;
+}
+
+QDialog QCheckBox::indicator:checked {
+    background-color: #3a7bc8;
+    border-color: #7ab8f5;
+}
+
+QDialog QCheckBox::indicator:hover {
+    border-color: #7ab8f5;
+    background-color: #253a5a;
+}
+
 QDialog QPushButton {
     background-color: #3a7bc8;
     border: 1px solid #5a9be8;

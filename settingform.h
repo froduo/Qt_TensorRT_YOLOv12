@@ -25,6 +25,7 @@ private:
 private slots:
     void handleBrowsePath(); // 浏览引擎文件按钮槽函数
     void handleBrowseClasses(); // 浏览类别文件按钮槽函数
+    void handleBrowseSavePath(); // 浏览保存路径按钮槽函数
 };
 
 #endif // SETTINGFORM_H

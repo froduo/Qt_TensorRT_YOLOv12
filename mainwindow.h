@@ -5,6 +5,10 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QElapsedTimer>
+#include <QStorageInfo>
+#include <QDir>
+#include <QFileInfo>
+#include <QDateTime>
 #include "cameracontroller.h"
 #include "grabthread.h"
 #include "inferthread.h"
@@ -14,7 +18,8 @@
 #include "settingform.h"
 #include "offlineverifyform.h"
 #include "imageview.h"
-#include"logger.h"
+#include "saveimageworker.h"
+#include "logger.h"
 
 // 1. 声明 Ui 命名空间
 namespace Ui {
@@ -50,8 +55,21 @@ private:
     QLabel *statusLabel;    // 相机状态标签
     QLabel *timeLabel;      // 时间显示标签
     QLabel *runTimeLabel;   // 运行时长标签
+    QLabel *diskLabel;      // 磁盘空间状态标签
     QTimer *sysTimer;       // 系统时钟定时器
     QElapsedTimer m_elapsedTimer; // 运行计时器
+    QTimer *m_diskTimer;    // 磁盘空间监控定时器
+    bool m_diskFull = false; // 磁盘空间不足标志（<1G时禁止保存）
+
+    // 后台图像保存
+    SaveImageWorker *m_saveWorker{nullptr};
+    QThread *m_saveThread{nullptr};
+
+    // ⭐ 自动重连相关
+    QTimer *m_reconnectTimer{nullptr}; // 重连定时器
+    int     m_reconnectAttempts{0};    // 重连尝试次数
+    static const int MAX_RECONNECT_ATTEMPTS = 60; // 最多尝试60次（约5分钟）
+    static const int RECONNECT_INTERVAL_MS = 5000; // 每5秒尝试一次
 
     void updateCameraStatus(bool connected); // 封装状态更新逻辑
     // private 变量增加
@@ -70,10 +88,17 @@ private:
     // 主界面 ImageView（用于显示视频/推理结果，支持缩放拖拽）
     ImageView* m_imageView {nullptr};
 
+private:
+    void saveInferenceImage(const QImage &img, const std::vector<Detection> &results);
+    void updateDiskSpaceStatus();
+    void initSaveWorker(); // 初始化后台保存线程
+
 private slots:
     void onUpdateSystemTime(); // 更新时间槽函数
     void showAbout();
     void on_actionversion_triggered();
+    void onGrabThreadDeviceLost(); // ⭐ 抓图线程检测到掉线
+    void onTryReconnect();         // ⭐ 尝试重连
 };
 
 #endif // MAINWINDOW_H

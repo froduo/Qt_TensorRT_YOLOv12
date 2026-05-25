@@ -3,8 +3,14 @@
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QTimer>
+#include <QThread>
 #include <QBoxLayout>
 #include <QCoreApplication>
+#include <QStorageInfo>
+#include <QDir>
+#include <QFileInfo>
+#include <QDateTime>
+#include <opencv2/opencv.hpp>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -30,8 +36,7 @@ MainWindow::MainWindow(QWidget *parent)
     LOG_INFO("Software starting...");
     m_config.load();
     LOG_INFO("Config loaded.");
-    QString title = QString("YOLOv12 Sensor Core [%1]").arg(APP_VERSION_STR);
-    this->setWindowTitle(title);
+    this->setWindowTitle(m_config.windowTitle);
 
     LOG_INFO("Software starting... Version: " + QString(APP_VERSION_STR));
     grabThread = nullptr;
@@ -76,11 +81,16 @@ MainWindow::MainWindow(QWidget *parent)
     runTimeLabel = new QLabel("RUN: 00:00:00", this);
     runTimeLabel->setStyleSheet("color: #ffd54f; font-family: 'Consolas'; font-size: 13px; font-weight: bold; padding: 0 10px; border-right: 1px solid #2e3a51;");
 
+    // 磁盘空间状态标签
+    diskLabel = new QLabel("DISK: --", this);
+    diskLabel->setStyleSheet("color: #7ad7ff; font-family: 'Consolas'; font-size: 13px; font-weight: bold; padding: 0 10px; border-right: 1px solid #2e3a51;");
+
     timeLabel = new QLabel(this);
     timeLabel->setStyleSheet("color: #7ad7ff; font-family: 'Consolas'; font-size: 14px; padding: 0 10px; border-left: 1px solid #2e3a51;");
 
     // 运行时长放在状态栏最左侧（先添加的靠左）
     ui->statusbar->addPermanentWidget(runTimeLabel);
+    ui->statusbar->addPermanentWidget(diskLabel);
 
     ui->statusbar->addPermanentWidget(netTitle);
     ui->statusbar->addPermanentWidget(netLed);
@@ -148,8 +158,17 @@ MainWindow::MainWindow(QWidget *parent)
     sysTimer->start(1000);
     onUpdateSystemTime();
 
+    // 磁盘空间监控定时器，每3秒更新一次
+    m_diskTimer = new QTimer(this);
+    connect(m_diskTimer, &QTimer::timeout, this, &MainWindow::updateDiskSpaceStatus);
+    m_diskTimer->start(3000);
+    updateDiskSpaceStatus();
+
     serialMgr->openPort(m_config.serialPort, m_config.baudRate);
     networkMgr->connectToServer(m_config.netIp, m_config.netPort);
+
+    // 初始化后台图像保存线程
+    initSaveWorker();
 }
 
 MainWindow::~MainWindow()
@@ -160,6 +179,17 @@ MainWindow::~MainWindow()
         inferThread->quit();
         inferThread->wait();
     }
+
+    // 清理后台保存线程
+    if (m_saveThread) {
+        m_saveThread->quit();
+        m_saveThread->wait(2000);
+        delete m_saveWorker;
+        m_saveWorker = nullptr;
+        delete m_saveThread;
+        m_saveThread = nullptr;
+    }
+
     delete ui;
 }
 
@@ -168,7 +198,12 @@ void MainWindow::stopGrabbing()
     if(grabThread)
     {
         grabThread->stop();
-        grabThread->wait();
+        // 使用超时等待，避免 UI 线程长时间阻塞
+        if(!grabThread->wait(2000)) {
+            LOG_WARN("GrabThread did not stop within 2s, forcing termination...");
+            grabThread->terminate();
+            grabThread->wait(500);
+        }
         delete grabThread;
         grabThread = nullptr;
     }
@@ -188,7 +223,23 @@ void MainWindow::onCloseCamera()
         m_imageView->setImage(QImage());
     }
     ui->btnOpen->setEnabled(true);
+    // btnOpen 恢复为默认蓝色样式（移除禁用样式覆盖）
+    ui->btnOpen->setStyleSheet("");
+
     ui->btnClose->setEnabled(false);
+    // btnClose 禁用时显示为灰色，与激活状态的红色明显区分
+    ui->btnClose->setStyleSheet(
+        "QPushButton {"
+        "   background-color: #3a3545;"
+        "   border: 1px solid #5a4a6a;"
+        "   border-radius: 8px;"
+        "   color: #7a7a8a;"
+        "   padding: 10px 16px;"
+        "   font-weight: 600;"
+        "   font-size: 12px;"
+        "   min-height: 38px;"
+        "}"
+    );
 }
 
 void MainWindow::onOpen()
@@ -240,14 +291,58 @@ void MainWindow::onOpen()
     camera.startGrabbing();
     grabThread = new GrabThread(&camera);
 
+    // ⭐ 设置目标序列号用于重连
+    camera.setTargetSN(m_config.cameraSN);
+
+    // ⭐ 连接抓图线程的掉线信号
+    connect(grabThread, &GrabThread::deviceLost,
+            this, &MainWindow::onGrabThreadDeviceLost);
+
+    // ⭐ 使用 DirectConnection：InferThread 没有事件循环，QueuedConnection 无法工作
+    // onFrameReceived 仅将帧入队（O(1)操作），不会阻塞 GrabThread 的帧捕获循环
+    // InferThread 内部使用帧队列解耦，确保生产和消费互不阻塞
     connect(grabThread, &GrabThread::sendFrame,
-            inferThread, &InferThread::setFrame,
-            Qt::QueuedConnection);
+            inferThread, &InferThread::onFrameReceived,
+            Qt::DirectConnection);
 
     grabThread->start(QThread::HighestPriority);
 
     ui->btnOpen->setEnabled(false);
+    // btnOpen 禁用时显示为灰色
+    ui->btnOpen->setStyleSheet(
+        "QPushButton {"
+        "   background-color: #3a3545;"
+        "   border: 1px solid #5a4a6a;"
+        "   border-radius: 8px;"
+        "   color: #7a7a8a;"
+        "   padding: 10px 16px;"
+        "   font-weight: 600;"
+        "   font-size: 12px;"
+        "   min-height: 38px;"
+        "}"
+    );
+
     ui->btnClose->setEnabled(true);
+    // btnClose 激活时显示为醒目的红色，与禁用灰色明显区分
+    ui->btnClose->setStyleSheet(
+        "QPushButton {"
+        "   background-color: #8b1a2b;"
+        "   border: 2px solid #e04060;"
+        "   border-radius: 8px;"
+        "   color: #ffffff;"
+        "   padding: 10px 16px;"
+        "   font-weight: 700;"
+        "   font-size: 13px;"
+        "   min-height: 38px;"
+        "}"
+        "QPushButton:hover {"
+        "   background-color: #a02030;"
+        "   border-color: #ff5070;"
+        "}"
+        "QPushButton:pressed {"
+        "   background-color: #5a0a1a;"
+        "}"
+    );
 
     ui->label_exp->setText(QString("EXP: %1 us").arg(static_cast<int>(m_config.exposure)));
     ui->label_exp->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500;");
@@ -297,10 +392,39 @@ void MainWindow::onOpenImage()
 
 void MainWindow::updateImage(QImage img, float inferTimeMs, float fps, std::vector<Detection> results)
 {
-    if(img.isNull()) return;
-    if(!m_imageView || m_imageView->size().isEmpty()) return;
+    if(img.isNull()) {
+        LOG_WARN("[MainWindow] updateImage received null image");
+        return;
+    }
+    if(!m_imageView || m_imageView->size().isEmpty()) {
+        LOG_WARN("[MainWindow] updateImage: imageView not ready, size empty");
+        return;
+    }
 
-    if(this->isMinimized()) return;
+    if(this->isMinimized()) {
+        // ⭐ 窗口最小化时不更新图像，但记录日志
+        static bool minimizedLogged = false;
+        if (!minimizedLogged) {
+            LOG_INFO("[MainWindow] Window is minimized, skipping image update");
+            minimizedLogged = true;
+        }
+        return;
+    }
+
+    // ⭐ 关键日志：每30秒记录一次图像更新状态
+    static QElapsedTimer updateLogTimer;
+    if (!updateLogTimer.isValid()) updateLogTimer.start();
+    static int updateCount = 0;
+    updateCount++;
+    if (updateCount % 300 == 0 || updateLogTimer.elapsed() >= 30000) {
+        LOG_INFO(QString("[MainWindow] updateImage #%1: img=%2x%3, fps=%4, infer=%5ms, det=%6")
+                 .arg(updateCount)
+                 .arg(img.width()).arg(img.height())
+                 .arg(QString::number(fps, 'f', 1))
+                 .arg(QString::number(inferTimeMs, 'f', 1))
+                 .arg(results.size()));
+        updateLogTimer.restart();
+    }
 
     m_imageView->setImage(img);
 
@@ -310,6 +434,9 @@ void MainWindow::updateImage(QImage img, float inferTimeMs, float fps, std::vect
     ui->label_inferTime->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
     ui->label_detCount->setText(QString("DET: %1").arg(results.size()));
     ui->label_detCount->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
+
+    // 保存推理图像
+    saveInferenceImage(img, results);
 
     if(!results.empty()) {
         networkMgr->sendDetectionResults(results);
@@ -329,10 +456,93 @@ void MainWindow::onCameraDisconnected()
     LOG_WARN("Camera device disconnected unexpectedly!");
     stopGrabbing();
     updateCameraStatus(false);
-    QMessageBox::critical(this,"Error","Camera disconnected!");
 
-    ui->btnOpen->setEnabled(true);
-    ui->btnClose->setEnabled(false);
+    // ⭐ 启动自动重连
+    ui->statusbar->showMessage("相机掉线，正在尝试自动重连...");
+    m_reconnectAttempts = 0;
+    if (!m_reconnectTimer) {
+        m_reconnectTimer = new QTimer(this);
+        connect(m_reconnectTimer, &QTimer::timeout, this, &MainWindow::onTryReconnect);
+    }
+    m_reconnectTimer->start(RECONNECT_INTERVAL_MS);
+    // 立即尝试一次
+    onTryReconnect();
+}
+
+// ⭐ 抓图线程检测到掉线（与 deviceDisconnected 信号等效）
+void MainWindow::onGrabThreadDeviceLost()
+{
+    LOG_WARN("GrabThread detected device lost, initiating reconnect...");
+    // 清理抓图线程
+    if (grabThread) {
+        grabThread->stop();
+        grabThread->wait();
+        delete grabThread;
+        grabThread = nullptr;
+    }
+    if (camera.isOpen()) {
+        camera.closeCamera();
+    }
+    updateCameraStatus(false);
+
+    // 启动自动重连
+    ui->statusbar->showMessage("相机掉线，正在尝试自动重连...");
+    m_reconnectAttempts = 0;
+    if (!m_reconnectTimer) {
+        m_reconnectTimer = new QTimer(this);
+        connect(m_reconnectTimer, &QTimer::timeout, this, &MainWindow::onTryReconnect);
+    }
+    m_reconnectTimer->start(RECONNECT_INTERVAL_MS);
+    onTryReconnect();
+}
+
+// ⭐ 尝试重连
+void MainWindow::onTryReconnect()
+{
+    m_reconnectAttempts++;
+    LOG_INFO(QString("Reconnect attempt %1/%2...").arg(m_reconnectAttempts).arg(MAX_RECONNECT_ATTEMPTS));
+    ui->statusbar->showMessage(QString("正在重连相机... (%1/%2)")
+                                   .arg(m_reconnectAttempts).arg(MAX_RECONNECT_ATTEMPTS));
+
+    if (camera.reconnect()) {
+        // 重连成功
+        LOG_INFO("Camera reconnected successfully!");
+        m_reconnectTimer->stop();
+        m_reconnectAttempts = 0;
+
+        // 恢复参数设置
+        camera.setExposureTime(m_config.exposure);
+        camera.setGain(m_config.gain);
+
+        // 重新创建 GrabThread
+        grabThread = new GrabThread(&camera);
+        connect(grabThread, &GrabThread::deviceLost,
+                this, &MainWindow::onGrabThreadDeviceLost);
+        // ⭐ 使用 DirectConnection：onFrameReceived 仅入队，不阻塞 GrabThread
+        connect(grabThread, &GrabThread::sendFrame,
+                inferThread, &InferThread::onFrameReceived,
+                Qt::DirectConnection);
+        grabThread->start(QThread::HighestPriority);
+
+        updateCameraStatus(true);
+        ui->statusbar->showMessage("相机重连成功", 3000);
+        ui->btnOpen->setEnabled(false);
+        ui->btnClose->setEnabled(true);
+        return;
+    }
+
+    // 重连失败
+    if (m_reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        // 超过最大尝试次数，放弃
+        m_reconnectTimer->stop();
+        m_reconnectAttempts = 0;
+        LOG_ERR("Max reconnect attempts reached, giving up.");
+        ui->statusbar->showMessage("相机重连失败，请手动点击 START CAMERA", 5000);
+        ui->btnOpen->setEnabled(true);
+        ui->btnClose->setEnabled(false);
+        QMessageBox::warning(this, "重连失败",
+                             QString("已尝试 %1 次重连均失败，请检查相机连接后手动启动。").arg(MAX_RECONNECT_ATTEMPTS));
+    }
 }
 
 void MainWindow::onEngineLoadFailed(QString msg)
@@ -354,6 +564,9 @@ void MainWindow::onSetParams()
         m_config = dlg.getUpdatedConfig();
         m_config.save();
         LOG_INFO("System parameters updated and saved to config.ini");
+
+        // 更新主界面标题
+        this->setWindowTitle(m_config.windowTitle);
 
         if(camera.isOpen()){
             camera.setExposureTime(m_config.exposure);
@@ -468,4 +681,127 @@ void MainWindow::showAbout()
 void MainWindow::on_actionversion_triggered()
 {
     showAbout();
+}
+
+void MainWindow::saveInferenceImage(const QImage &img, const std::vector<Detection> &results)
+{
+    // 如果磁盘已满（<1G），不保存
+    if (m_diskFull) {
+        return;
+    }
+
+    bool hasDetection = !results.empty();
+    bool shouldSave = false;
+
+    if (hasDetection && m_config.saveNG) {
+        shouldSave = true;
+    } else if (!hasDetection && m_config.saveOK) {
+        shouldSave = true;
+    }
+
+    if (!shouldSave) return;
+
+    // 通过信号发送到后台线程保存，不阻塞 UI 线程
+    if (m_saveWorker) {
+        // 同步保存参数到后台线程
+        m_saveWorker->setSaveParams(m_config.savePath, m_config.saveFormat, m_config.jpegQuality);
+        m_saveWorker->setDiskFull(m_diskFull);
+        // 发射信号，后台线程执行保存
+        emit m_saveWorker->onSaveImage(img, hasDetection);
+    }
+}
+
+void MainWindow::updateDiskSpaceStatus()
+{
+    QString savePath = m_config.savePath;
+    if (savePath.isEmpty()) {
+        savePath = QCoreApplication::applicationDirPath();
+    }
+
+    QStorageInfo storage(savePath);
+    if (!storage.isValid() || !storage.isReady()) {
+        diskLabel->setText("DISK: --");
+        diskLabel->setStyleSheet("color: #7ad7ff; font-family: 'Consolas'; font-size: 13px; font-weight: bold; padding: 0 10px; border-right: 1px solid #2e3a51;");
+        return;
+    }
+
+    // 计算剩余空间（字节）
+    qint64 bytesFree = storage.bytesAvailable();
+    qint64 bytesTotal = storage.bytesTotal();
+
+    // 计算已用空间（当前保存目录占用的空间）
+    qint64 bytesUsed = 0;
+    QDir dir(m_config.savePath);
+    if (dir.exists()) {
+        QFileInfoList files = dir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+        for (const QFileInfo &fi : files) {
+            bytesUsed += fi.size();
+        }
+        // 递归统计子目录
+        QFileInfoList dirs = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+        for (const QFileInfo &di : dirs) {
+            QDir subDir(di.absoluteFilePath());
+            QFileInfoList subFiles = subDir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+            for (const QFileInfo &sfi : subFiles) {
+                bytesUsed += sfi.size();
+            }
+        }
+    }
+
+    // 格式化显示
+    double freeGB = bytesFree / (1024.0 * 1024.0 * 1024.0);
+    double usedMB = bytesUsed / (1024.0 * 1024.0);
+    double totalGB = bytesTotal / (1024.0 * 1024.0 * 1024.0);
+
+    QString diskText = QString("DISK: %1G/%2G | USED: %3M")
+                           .arg(QString::number(freeGB, 'f', 1))
+                           .arg(QString::number(totalGB, 'f', 1))
+                           .arg(QString::number(usedMB, 'f', 0));
+
+    // 判断空间状态
+    const qint64 WARN_THRESHOLD = 1LL * 1024 * 1024 * 1024; // 1GB
+    const qint64 FULL_THRESHOLD = 100LL * 1024 * 1024;      // 100MB（几乎满）
+
+    if (bytesFree < FULL_THRESHOLD) {
+        // 红色 - 空间不足，禁止保存
+        m_diskFull = true;
+        diskLabel->setText(diskText + " | DISK FULL!");
+        diskLabel->setStyleSheet("color: #FF1744; font-family: 'Consolas'; font-size: 13px; font-weight: bold; padding: 0 10px; border-right: 1px solid #2e3a51; background-color: #4a0000;");
+    } else if (bytesFree < WARN_THRESHOLD) {
+        // 黄色 - 空间不足1G，警告
+        m_diskFull = false;
+        diskLabel->setText(diskText + " | LOW SPACE!");
+        diskLabel->setStyleSheet("color: #FFD600; font-family: 'Consolas'; font-size: 13px; font-weight: bold; padding: 0 10px; border-right: 1px solid #2e3a51; background-color: #3a3a00;");
+    } else {
+        // 正常 - 绿色
+        m_diskFull = false;
+        diskLabel->setText(diskText);
+        diskLabel->setStyleSheet("color: #8dffbf; font-family: 'Consolas'; font-size: 13px; font-weight: bold; padding: 0 10px; border-right: 1px solid #2e3a51;");
+    }
+
+    // 同步磁盘满标志到后台保存线程
+    if (m_saveWorker) {
+        m_saveWorker->setDiskFull(m_diskFull);
+    }
+}
+
+void MainWindow::initSaveWorker()
+{
+    m_saveWorker = new SaveImageWorker(); // 无 parent，将移入后台线程
+    m_saveThread = new QThread(this);
+
+    // 初始化保存参数
+    m_saveWorker->setSaveParams(m_config.savePath, m_config.saveFormat, m_config.jpegQuality);
+    m_saveWorker->setDiskFull(m_diskFull);
+
+    // 将 worker 移入后台线程
+    m_saveWorker->moveToThread(m_saveThread);
+
+    // 线程结束时清理 worker
+    connect(m_saveThread, &QThread::finished, m_saveWorker, &QObject::deleteLater);
+
+    // 启动线程
+    m_saveThread->start();
+
+    LOG_INFO("[MainWindow] SaveImageWorker initialized in background thread");
 }

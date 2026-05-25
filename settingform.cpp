@@ -19,6 +19,15 @@ settingForm::settingForm(const AppConfig &config, QWidget *parent)
 
     scanSerialPorts();
 
+    ui->txtWindowTitle->setText(config.windowTitle);
+
+    // 图像保存参数
+    ui->chkSaveNG->setChecked(config.saveNG);
+    ui->chkSaveOK->setChecked(config.saveOK);
+    ui->txtSavePath->setText(config.savePath);
+    ui->cbSaveFormat->setCurrentText(config.saveFormat);
+    ui->valJpegQuality->setValue(config.jpegQuality);
+
     ui->txtSN->setText(config.cameraSN);
     ui->valExp->setValue(config.exposure);
     ui->valGain->setValue(config.gain);
@@ -36,6 +45,14 @@ settingForm::settingForm(const AppConfig &config, QWidget *parent)
     connect(ui->btnCancel, &QPushButton::clicked, this, &settingForm::reject);
     connect(ui->btnBrowsePath, &QPushButton::clicked, this, &settingForm::handleBrowsePath);
     connect(ui->btnBrowseClasses, &QPushButton::clicked, this, &settingForm::handleBrowseClasses);
+    connect(ui->btnBrowseSavePath, &QPushButton::clicked, this, &settingForm::handleBrowseSavePath);
+
+    // JPEG QUALITY 仅在 jpg 格式时可编辑
+    auto updateJpegQualityEnabled = [=]() {
+        ui->valJpegQuality->setEnabled(ui->cbSaveFormat->currentText() == "jpg");
+    };
+    connect(ui->cbSaveFormat, &QComboBox::currentTextChanged, this, updateJpegQualityEnabled);
+    updateJpegQualityEnabled(); // 初始化状态
 }
 
 settingForm::~settingForm()
@@ -46,6 +63,15 @@ settingForm::~settingForm()
 AppConfig settingForm::getUpdatedConfig() const
 {
     AppConfig cfg;
+    cfg.windowTitle  = ui->txtWindowTitle->text().trimmed();
+
+    // 图像保存参数
+    cfg.saveNG       = ui->chkSaveNG->isChecked();
+    cfg.saveOK       = ui->chkSaveOK->isChecked();
+    cfg.savePath     = ui->txtSavePath->text().trimmed();
+    cfg.saveFormat   = ui->cbSaveFormat->currentText();
+    cfg.jpegQuality  = ui->valJpegQuality->value();
+
     cfg.cameraSN     = ui->txtSN->text().trimmed();
     cfg.exposure     = ui->valExp->value();
     cfg.gain         = ui->valGain->value();
@@ -94,6 +120,25 @@ void settingForm::handleBrowsePath()
 
     if (!file.isEmpty()) {
         ui->txtEnginePath->setText(file);
+    }
+}
+
+void settingForm::handleBrowseSavePath()
+{
+    QString initDir = ui->txtSavePath->text().trimmed();
+    if (initDir.isEmpty()) {
+        initDir = QCoreApplication::applicationDirPath();
+    }
+
+    QString dir = QFileDialog::getExistingDirectory(
+        this,
+        "选择图像保存根目录",
+        initDir,
+        QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks
+    );
+
+    if (!dir.isEmpty()) {
+        ui->txtSavePath->setText(dir);
     }
 }
 
