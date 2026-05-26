@@ -28,16 +28,32 @@ settingForm::settingForm(const AppConfig &config, QWidget *parent)
     ui->cbSaveFormat->setCurrentText(config.saveFormat);
     ui->valJpegQuality->setValue(config.jpegQuality);
 
+    // 相机1参数
     ui->txtSN->setText(config.cameraSN);
     ui->valExp->setValue(config.exposure);
     ui->valGain->setValue(config.gain);
+
+    // 相机2参数
+    ui->txtSN2->setText(config.cameraSN2);
+    ui->valExp2->setValue(config.exposure2);
+    ui->valGain2->setValue(config.gain2);
+
     ui->cbSerialPort->setCurrentText(config.serialPort);
     ui->cbBaud->setCurrentText(QString::number(config.baudRate));
     ui->txtIP->setText(config.netIp);
     ui->valNetPort->setValue(config.netPort);
+
+    // 相机1推理
+    ui->chkEnableInference->setChecked(config.enableInference);
     ui->txtEnginePath->setText(config.enginePath);
     ui->txtClassesPath->setText(config.classesPath);
     ui->valScoreThresh->setValue(config.scoreThreshold);
+
+    // 相机2推理
+    ui->chkEnableInference2->setChecked(config.enableInference2);
+    ui->txtEnginePath2->setText(config.enginePath2);
+    ui->txtClassesPath2->setText(config.classesPath2);
+    ui->valScoreThresh2->setValue(config.scoreThreshold2);
 
     ensureDefaultClassesFile();
 
@@ -46,6 +62,8 @@ settingForm::settingForm(const AppConfig &config, QWidget *parent)
     connect(ui->btnBrowsePath, &QPushButton::clicked, this, &settingForm::handleBrowsePath);
     connect(ui->btnBrowseClasses, &QPushButton::clicked, this, &settingForm::handleBrowseClasses);
     connect(ui->btnBrowseSavePath, &QPushButton::clicked, this, &settingForm::handleBrowseSavePath);
+    connect(ui->btnBrowsePath2, &QPushButton::clicked, this, &settingForm::handleBrowsePath2);
+    connect(ui->btnBrowseClasses2, &QPushButton::clicked, this, &settingForm::handleBrowseClasses2);
 
     // JPEG QUALITY 仅在 jpg 格式时可编辑
     auto updateJpegQualityEnabled = [=]() {
@@ -72,16 +90,33 @@ AppConfig settingForm::getUpdatedConfig() const
     cfg.saveFormat   = ui->cbSaveFormat->currentText();
     cfg.jpegQuality  = ui->valJpegQuality->value();
 
+    // 相机1参数
     cfg.cameraSN     = ui->txtSN->text().trimmed();
     cfg.exposure     = ui->valExp->value();
     cfg.gain         = ui->valGain->value();
+
+    // 相机2参数
+    cfg.cameraSN2    = ui->txtSN2->text().trimmed();
+    cfg.exposure2    = ui->valExp2->value();
+    cfg.gain2        = ui->valGain2->value();
+
     cfg.serialPort   = ui->cbSerialPort->currentText();
     cfg.baudRate     = ui->cbBaud->currentText().toInt();
     cfg.netIp        = ui->txtIP->text().trimmed();
     cfg.netPort      = ui->valNetPort->value();
+
+    // 相机1推理
+    cfg.enableInference = ui->chkEnableInference->isChecked();
     cfg.enginePath   = ui->txtEnginePath->text().trimmed();
     cfg.classesPath  = ui->txtClassesPath->text().trimmed();
     cfg.scoreThreshold = ui->valScoreThresh->value();
+
+    // 相机2推理
+    cfg.enableInference2 = ui->chkEnableInference2->isChecked();
+    cfg.enginePath2  = ui->txtEnginePath2->text().trimmed();
+    cfg.classesPath2 = ui->txtClassesPath2->text().trimmed();
+    cfg.scoreThreshold2 = ui->valScoreThresh2->value();
+
     return cfg;
 }
 
@@ -165,6 +200,60 @@ void settingForm::handleBrowseClasses()
 
     if (!file.isEmpty()) {
         ui->txtClassesPath->setText(file);
+    }
+}
+
+// ⭐ 相机2浏览引擎文件
+void settingForm::handleBrowsePath2()
+{
+    QString initDir = ui->txtEnginePath2->text().trimmed();
+    if (initDir.isEmpty()) {
+        initDir = QCoreApplication::applicationDirPath() + "/model";
+    } else {
+        QFileInfo fileInfo(initDir);
+        if (fileInfo.isFile()) {
+            initDir = fileInfo.absolutePath();
+        }
+    }
+
+    QString file = QFileDialog::getOpenFileName(
+        this,
+        "选择相机2推理引擎文件",
+        initDir,
+        "Engine 文件 (*.engine);;所有文件 (*)",
+        nullptr,
+        QFileDialog::DontResolveSymlinks
+    );
+
+    if (!file.isEmpty()) {
+        ui->txtEnginePath2->setText(file);
+    }
+}
+
+// ⭐ 相机2浏览类别文件
+void settingForm::handleBrowseClasses2()
+{
+    QString initDir = ui->txtClassesPath2->text().trimmed();
+    if (initDir.isEmpty()) {
+        initDir = QCoreApplication::applicationDirPath() + "/model";
+    } else {
+        QFileInfo fileInfo(initDir);
+        if (fileInfo.isFile()) {
+            initDir = fileInfo.absolutePath();
+        }
+    }
+
+    QString file = QFileDialog::getOpenFileName(
+        this,
+        "选择相机2类别配置文件",
+        initDir,
+        "YAML 文件 (*.yaml *.yml);;所有文件 (*)",
+        nullptr,
+        QFileDialog::DontResolveSymlinks
+    );
+
+    if (!file.isEmpty()) {
+        ui->txtClassesPath2->setText(file);
     }
 }
 

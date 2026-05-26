@@ -7,10 +7,15 @@
 #include <QDebug>
 
 struct AppConfig {
-    // 相机参数
+    // 相机1参数
     QString cameraSN = "SN12345678";
     double exposure = 5000.0;
     double gain = 0.0;
+
+    // 相机2参数
+    QString cameraSN2 = "SN87654321";
+    double exposure2 = 5000.0;
+    double gain2 = 0.0;
 
     // 串口参数
     QString serialPort = "ttyUSB0";
@@ -30,10 +35,18 @@ struct AppConfig {
     QString saveFormat = "jpg";   // 保存格式: jpg/bmp/tif
     int jpegQuality = 95;         // JPEG压缩质量 1-100
 
-    // 推理参数
+    // 推理参数 - 相机1
+    bool enableInference = true;   // 是否启用推理
     double scoreThreshold = 0.25; // 默认得分阈值
-    QString enginePath = "./model/yolo12n_trt10_x86.engine"; // 新增推理路径
+    QString enginePath = "./model/yolo12n_trt10_x86.engine"; // 推理引擎路径
     QString classesPath = "./model/coco.yaml"; // 检测类别文件路径
+
+    // 推理参数 - 相机2
+    bool enableInference2 = true;  // 是否启用推理
+    double scoreThreshold2 = 0.25;
+    QString enginePath2 = "./model/yolo12n_trt10_x86.engine";
+    QString classesPath2 = "./model/coco.yaml";
+
     // 保存到文件
     void save() {
         QString path = QCoreApplication::applicationDirPath() + "/config.ini";
@@ -43,6 +56,12 @@ struct AppConfig {
         s.setValue("SN", cameraSN);
         s.setValue("Exposure", exposure);
         s.setValue("Gain", gain);
+        s.endGroup();
+
+        s.beginGroup("Camera2");
+        s.setValue("SN", cameraSN2);
+        s.setValue("Exposure", exposure2);
+        s.setValue("Gain", gain2);
         s.endGroup();
 
         s.beginGroup("Serial");
@@ -68,11 +87,19 @@ struct AppConfig {
         s.endGroup();
 
         s.beginGroup("Inference");
+        s.setValue("EnableInference", enableInference);
         s.setValue("ScoreThreshold", scoreThreshold);
-        s.setValue("EnginePath", enginePath); // 保存路径
-        s.setValue("ClassesPath", classesPath); // 保存类别文件路径
+        s.setValue("EnginePath", enginePath);
+        s.setValue("ClassesPath", classesPath);
         s.endGroup();
-        s.sync(); // 强制将内存中的设置立即写入磁盘文件
+
+        s.beginGroup("Inference2");
+        s.setValue("EnableInference", enableInference2);
+        s.setValue("ScoreThreshold", scoreThreshold2);
+        s.setValue("EnginePath", enginePath2);
+        s.setValue("ClassesPath", classesPath2);
+        s.endGroup();
+        s.sync();
     }
 
     // 从文件读取
@@ -81,6 +108,10 @@ struct AppConfig {
         cameraSN = s.value("Camera/SN", "SN12345678").toString();
         exposure = s.value("Camera/Exposure", 5000.0).toDouble();
         gain = s.value("Camera/Gain", 0.0).toDouble();
+
+        cameraSN2 = s.value("Camera2/SN", "SN87654321").toString();
+        exposure2 = s.value("Camera2/Exposure", 5000.0).toDouble();
+        gain2 = s.value("Camera2/Gain", 0.0).toDouble();
 
         serialPort = s.value("Serial/Port", "ttyUSB0").toString();
         baudRate = s.value("Serial/Baud", 115200).toInt();
@@ -96,9 +127,15 @@ struct AppConfig {
         saveFormat = s.value("ImageSave/SaveFormat", "jpg").toString();
         jpegQuality = s.value("ImageSave/JpegQuality", 95).toInt();
 
+        enableInference = s.value("Inference/EnableInference", true).toBool();
         enginePath = s.value("Inference/EnginePath", "./model/yolo12n_trt10_x86.engine").toString();
         scoreThreshold = s.value("Inference/ScoreThreshold", 0.25).toDouble();
         classesPath = s.value("Inference/ClassesPath", "./model/coco.yaml").toString();
+
+        enableInference2 = s.value("Inference2/EnableInference", true).toBool();
+        enginePath2 = s.value("Inference2/EnginePath", "./model/yolo12n_trt10_x86.engine").toString();
+        scoreThreshold2 = s.value("Inference2/ScoreThreshold", 0.25).toDouble();
+        classesPath2 = s.value("Inference2/ClassesPath", "./model/coco.yaml").toString();
     }
 };
 

@@ -2,6 +2,7 @@
 #define SETTINGFORM_H
 
 #include <QDialog>
+#include <QCheckBox>
 #include "app_config.h"
 
 namespace Ui {
@@ -26,6 +27,8 @@ private slots:
     void handleBrowsePath(); // 浏览引擎文件按钮槽函数
     void handleBrowseClasses(); // 浏览类别文件按钮槽函数
     void handleBrowseSavePath(); // 浏览保存路径按钮槽函数
+    void handleBrowsePath2(); // 相机2浏览引擎文件按钮槽函数
+    void handleBrowseClasses2(); // 相机2浏览类别文件按钮槽函数
 };
 
 #endif // SETTINGFORM_H

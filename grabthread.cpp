@@ -1,4 +1,5 @@
 #include "grabthread.h"
+#include "inferthread.h"
 #include "logger.h"
 
 GrabThread::GrabThread(CameraController* cam)
@@ -72,7 +73,10 @@ void GrabThread::run()
             frameTimer.restart();
         }
 
-        emit sendFrame(frameClone);
+        // ⭐ 直接投递帧到 InferThread 的队列，避免信号跨线程阻塞
+        if (m_inferThread) {
+            m_inferThread->setFrame(frameClone);
+        }
     }
 
     LOG_INFO(QString("[GrabThread] Exited, total frames captured: %1").arg(frameIndex));

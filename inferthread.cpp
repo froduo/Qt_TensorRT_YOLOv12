@@ -5,9 +5,10 @@
 #include <QElapsedTimer>
 #include <QImage>
 
-InferThread::InferThread(QObject *parent)
+InferThread::InferThread(QObject *parent, int cameraId)
     : QThread(parent),
     m_running(true),
+    m_cameraId(cameraId),
     yolo(nullptr)
 {
 }
@@ -89,27 +90,6 @@ void InferThread::setFrame(const cv::Mat &frame)
     cond.wakeOne();
 }
 
-// ⭐ 新增 slot：由信号触发，与 setFrame 功能相同但声明为 slot
-void InferThread::onFrameReceived(const cv::Mat& frame)
-{
-    QMutexLocker locker(&mutex);
-
-    // ⭐ 关键日志：记录帧接收情况
-    static int frameCount = 0;
-    frameCount++;
-    if (frameCount % 100 == 0) {
-        LOG_INFO(QString("[InferThread] onFrameReceived #%1, frame size=%2x%3")
-                 .arg(frameCount).arg(frame.cols).arg(frame.rows));
-    }
-
-    // ⭐ 如果队列已满，丢弃最旧的帧，防止内存暴涨
-    if (m_frameQueue.size() >= MAX_QUEUE_SIZE) {
-        m_frameQueue.dequeue();
-    }
-    m_frameQueue.enqueue(frame.clone());
-    cond.wakeOne();
-}
-
 void InferThread::run()
 {
     // ⭐ 重置运行标志，因为 stop() 将其设为 false，而 start() 不会自动重置
@@ -135,165 +115,128 @@ void InferThread::run()
 
     LOG_INFO("[InferThread] Run loop started");
 
+    // ⭐ 帧计数器，用于调试
+    int processedCount = 0;
+    QElapsedTimer logTimer;
+    logTimer.start();
+
     while (true)
     {
-        cv::Mat img;
-
+        // ===== 检查运行状态 =====
         {
             QMutexLocker locker(&mutex);
             if (!m_running) {
                 LOG_INFO("[InferThread] Run loop: m_running=false, exiting");
                 break;
             }
+        }
 
-            // ⭐ 使用帧队列：等待直到队列非空
-            bool waited = false;
-            while (m_frameQueue.isEmpty() && m_running)
-            {
-                if (!cond.wait(&mutex, FRAME_WAIT_TIMEOUT_MS))
-                {
-                    // ⭐ 超时返回 false，说明长时间没有新帧
-                    if (!m_running)
-                        break;
-                    // ⭐ 关键日志：记录超时等待
-                    qint64 idleMs = idleTimer.elapsed();
-                    if (!waited) {
-                        LOG_WARN(QString("[InferThread] First frame wait timeout (%1ms), idle=%2ms")
-                                 .arg(FRAME_WAIT_TIMEOUT_MS).arg(idleMs));
-                        waited = true;
-                    } else if (idleMs >= 5000) {
-                        // ⭐ 每5秒记录一次长时间空闲警告
-                        LOG_WARN(QString("[InferThread] No frame for %1 seconds, still waiting...")
-                                 .arg(idleMs / 1000));
-                        idleTimer.restart();
+        // ===== 取出待处理帧 =====
+        bool hasFrame = false;
+        cv::Mat img;
+
+        {
+            QMutexLocker locker(&mutex);
+            if (!m_frameQueue.isEmpty()) {
+                img = m_frameQueue.dequeue();
+                hasFrame = true;
+                idleTimer.restart();
+            }
+        }
+
+        // 如果没有帧，等待一下
+        if (!hasFrame) {
+            QThread::msleep(5);
+            continue;
+        }
+
+        // ===== 处理帧（推理或原始显示） =====
+        if (hasFrame && !img.empty()) {
+            try {
+                if (m_enableInference && yolo) {
+                    // ---- 推理模式 ----
+                    std::vector<Detection> results;
+
+                    QElapsedTimer inferTimer;
+                    inferTimer.start();
+
+                    yolo->preprocess(img);
+                    yolo->infer();
+                    yolo->postprocess(results);
+
+                    float inferTimeMs = inferTimer.elapsed();
+                    int detCount = results.size();
+
+                    yolo->draw(img, results);
+
+                    frameCount++;
+                    if (fpsTimer.elapsed() >= 1000)
+                    {
+                        fps = frameCount * 1000.0f / fpsTimer.elapsed();
+                        frameCount = 0;
+                        fpsTimer.restart();
                     }
+
+                    // 画文字
+                    char text1[128], text2[128], text3[128];
+                    sprintf(text1, "FPS: %.1f", fps);
+                    sprintf(text2, "Infer: %.2f ms", inferTimeMs);
+                    sprintf(text3, "Detections: %d", detCount);
+
+                    cv::rectangle(img, cv::Point(5, 5), cv::Point(5 + 260, 5 + 110), cv::Scalar(0, 0, 0), -1);
+                    cv::putText(img, text1, cv::Point(15, 35), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 255, 0), 2);
+                    cv::putText(img, text2, cv::Point(15, 70), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 255, 0), 2);
+                    cv::putText(img, text3, cv::Point(15, 105), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 255, 0), 2);
+
+                    cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
+                    QImage qimg(img.data, img.cols, img.rows, img.step, QImage::Format_RGB888);
+
+                    inferFrameCount++;
+                    if (inferFrameCount % 100 == 0 || inferLogTimer.elapsed() >= 5000) {
+                        LOG_INFO(QString("[InferThread] Inferred frame #%1, det=%2, time=%3ms, fps=%4, img=%5x%6")
+                                 .arg(inferFrameCount).arg(detCount)
+                                 .arg(QString::number(inferTimeMs, 'f', 1))
+                                 .arg(QString::number(fps, 'f', 1))
+                                 .arg(img.cols).arg(img.rows));
+                        inferLogTimer.restart();
+                    }
+
+                    emit sendResult(qimg.copy(), inferTimeMs, fps, results);
+                } else {
+                    // ---- 非推理模式：直接发送原始帧用于显示和保存 ----
+                    cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
+                    QImage qimg(img.data, img.cols, img.rows, img.step, QImage::Format_RGB888);
+                    emit sendRawFrame(qimg.copy(), m_cameraId);
                 }
+            } catch (std::exception& e) {
+                LOG_ERR(QString("[InferThread] Frame processing error: %1").arg(e.what()));
             }
 
-            if (!m_running) {
-                LOG_INFO("[InferThread] Run loop: m_running=false after wait, exiting");
-                break;
+            // ⭐ 日志：记录帧处理情况
+            processedCount++;
+            if (processedCount % 100 == 0 || logTimer.elapsed() >= 5000) {
+                LOG_INFO(QString("[InferThread] Processed #%1 frames, queue=%2")
+                         .arg(processedCount)
+                         .arg(m_frameQueue.size()));
+                logTimer.restart();
             }
-
-            // ⭐ 安全检查：如果队列仍为空（理论上不会发生），跳过本轮
-            if (m_frameQueue.isEmpty())
-            {
-                LOG_WARN("[InferThread] Skipping empty frame after wait (spurious wakeup)");
-                continue;
-            }
-
-            // ⭐ 从队列头部取出最旧的帧
-            img = m_frameQueue.dequeue();
-
-            // ⭐ 重置空闲计时器
-            idleTimer.restart();
         }
-
-        if (!yolo) {
-            LOG_WARN("[InferThread] yolo is null, skipping inference");
-            continue;
-        }
-
-        // ⭐ 安全检查：跳过空图像
-        if (img.empty())
-        {
-            LOG_WARN("[InferThread] Skipping inference on empty image");
-            continue;
-        }
-
-        std::vector<Detection> results;
-
-        // ===== 推理计时 =====
-        QElapsedTimer inferTimer;
-        inferTimer.start();
-
-        try
-        {
-            yolo->preprocess(img);
-            yolo->infer();
-            yolo->postprocess(results);
-        }
-        catch (std::exception& e)
-        {
-            LOG_ERR(QString("[InferThread] Inference error: %1").arg(e.what()));
-            continue;
-        }
-
-        float inferTimeMs = inferTimer.elapsed();
-        int detCount = results.size();
-
-        // 画检测框
-        yolo->draw(img, results);
-
-        // ===== FPS 统计 =====
-        frameCount++;
-        if (fpsTimer.elapsed() >= 1000)
-        {
-            fps = frameCount * 1000.0f / fpsTimer.elapsed();
-            frameCount = 0;
-            fpsTimer.restart();
-        }
-
-        // ===== 直接画文字到 img 上 =====
-        char text1[128];
-        char text2[128];
-        char text3[128];
-
-        sprintf(text1, "FPS: %.1f", fps);
-        sprintf(text2, "Infer: %.2f ms", inferTimeMs);
-        sprintf(text3, "Detections: %d", detCount);
-
-        double fontScale = 0.8;
-        int thickness = 2;
-        int fontFace = cv::FONT_HERSHEY_SIMPLEX;
-
-        cv::rectangle(img,
-                      cv::Point(5, 5),
-                      cv::Point(5 + 260, 5 + 110),
-                      cv::Scalar(0, 0, 0),
-                      -1);
-
-        cv::putText(img, text1, cv::Point(15, 35),
-                    fontFace, fontScale,
-                    cv::Scalar(0, 255, 0), thickness);
-
-        cv::putText(img, text2, cv::Point(15, 70),
-                    fontFace, fontScale,
-                    cv::Scalar(0, 255, 0), thickness);
-
-        cv::putText(img, text3, cv::Point(15, 105),
-                    fontFace, fontScale,
-                    cv::Scalar(0, 255, 0), thickness);
-
-        // 格式转换 OpenCV -> Qt
-        cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
-        QImage qimg(img.data,
-                    img.cols,
-                    img.rows,
-                    img.step,
-                    QImage::Format_RGB888);
-
-        // ⭐ 关键日志：每100帧记录一次推理状态
-        inferFrameCount++;
-        if (inferFrameCount % 100 == 0 || inferLogTimer.elapsed() >= 5000) {
-            LOG_INFO(QString("[InferThread] Inferred frame #%1, det=%2, time=%3ms, fps=%4, img=%5x%6")
-                     .arg(inferFrameCount).arg(detCount)
-                     .arg(QString::number(inferTimeMs, 'f', 1))
-                     .arg(QString::number(fps, 'f', 1))
-                     .arg(img.cols).arg(img.rows));
-            inferLogTimer.restart();
-        }
-
-        emit sendResult(qimg.copy(), inferTimeMs, fps, results);
     }
 
-    LOG_INFO(QString("[InferThread] Run loop exited, total inferred frames: %1").arg(inferFrameCount));
+    LOG_INFO(QString("[InferThread] Run loop exited, total inferred frames: %1")
+             .arg(inferFrameCount));
 }
+
 void InferThread::setScoreThreshold(float val) {
-    if (yolo) { // 必须判断引擎是否已创建
+    if (yolo) {
         yolo->confThreshold = val;
         qDebug() << "Detection threshold updated to:" << val;
     } else {
         qDebug() << "Warning: Cannot set threshold, YOLO engine not initialized.";
     }
+}
+
+void InferThread::setEnableInference(bool en) {
+    m_enableInference = en;
+    qDebug() << "[InferThread] Inference" << (en ? "ENABLED" : "DISABLED");
 }

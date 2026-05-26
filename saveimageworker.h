@@ -35,7 +35,10 @@ public:
 
 public slots:
     /// 接收保存任务（在后台线程中执行）
-    void onSaveImage(const QImage &img, bool hasDetection);
+    /// @param img 图像
+    /// @param hasDetection 是否有检测结果
+    /// @param cameraId 相机标识（1 或 2）
+    void onSaveImage(const QImage &img, bool hasDetection, int cameraId = 1);
 
 signals:
     /// 保存完成信号（可选的，用于日志或状态更新）

@@ -16,83 +16,70 @@
   <property name="styleSheet">
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QHBoxLayout" name="horizontalLayout" stretch="8,2">
+   <layout class="QVBoxLayout" name="mainVerticalLayout">
     <property name="spacing">
-     <number>12</number>
+     <number>8</number>
     </property>
     <property name="leftMargin">
-     <number>15</number>
+     <number>10</number>
     </property>
     <property name="topMargin">
-     <number>15</number>
+     <number>10</number>
     </property>
     <property name="rightMargin">
-     <number>15</number>
+     <number>10</number>
     </property>
     <property name="bottomMargin">
-     <number>15</number>
+     <number>10</number>
     </property>
+    <!-- ===== 顶部工具栏行 ===== -->
     <item>
-     <widget class="QGraphicsView" name="imageView">
+     <widget class="QFrame" name="toolBarFrame">
       <property name="sizePolicy">
-       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+       <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
         <horstretch>0</horstretch>
         <verstretch>0</verstretch>
        </sizepolicy>
       </property>
       <property name="minimumSize">
        <size>
-        <width>640</width>
-        <height>480</height>
+        <width>0</width>
+        <height>120</height>
        </size>
       </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QFrame" name="controlPanel">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
-        <horstretch>0</horstretch>
-        <verstretch>0</verstretch>
-       </sizepolicy>
+      <property name="styleSheet">
+       <string notr="true">QFrame#toolBarFrame {
+    background-color: #0d1421;
+    border: 1px solid #2a3f5f;
+    border-radius: 10px;
+    padding: 4px;
+}</string>
       </property>
-      <property name="minimumSize">
-       <size>
-        <width>200</width>
-        <height>0</height>
-       </size>
-      </property>
-      <layout class="QVBoxLayout" name="verticalLayout_2">
+      <layout class="QHBoxLayout" name="toolBarLayout">
        <property name="spacing">
-        <number>12</number>
+        <number>10</number>
        </property>
        <property name="leftMargin">
-        <number>12</number>
+        <number>10</number>
        </property>
        <property name="topMargin">
-        <number>12</number>
+        <number>6</number>
        </property>
        <property name="rightMargin">
-        <number>12</number>
+        <number>10</number>
        </property>
        <property name="bottomMargin">
-        <number>12</number>
+        <number>6</number>
        </property>
-       <item>
-        <widget class="QLabel" name="label_title">
-         <property name="styleSheet">
-          <string/>
-         </property>
-         <property name="text">
-          <string>CONTROL PANEL</string>
-         </property>
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
-         </property>
-        </widget>
-       </item>
+       <!-- 按钮 -->
        <item>
         <widget class="QPushButton" name="btnOpen">
+         <property name="minimumSize">
+          <size>
+           <width>120</width>
+           <height>32</height>
+          </size>
+         </property>
          <property name="text">
           <string>START CAMERA</string>
          </property>
@@ -100,52 +87,60 @@
        </item>
        <item>
         <widget class="QPushButton" name="btnClose">
+         <property name="minimumSize">
+          <size>
+           <width>120</width>
+           <height>32</height>
+          </size>
+         </property>
          <property name="text">
           <string>STOP SYSTEM</string>
          </property>
         </widget>
        </item>
+       <!-- 分隔线 -->
        <item>
-        <spacer name="verticalSpacer">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
+        <widget class="QFrame" name="sep2">
+         <property name="frameShape">
+          <enum>QFrame::VLine</enum>
          </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>15</height>
-          </size>
+         <property name="frameShadow">
+          <enum>QFrame::Sunken</enum>
          </property>
-        </spacer>
+         <property name="styleSheet">
+          <string notr="true">color: #2a3f5f;</string>
+         </property>
+        </widget>
        </item>
+       <!-- CAM1 INFERENCE -->
        <item>
         <widget class="QGroupBox" name="groupBox_infer">
          <property name="styleSheet">
-          <string notr="true">QGroupBox { border: 2px solid #6B8E78; border-radius: 8px; margin-top: 12px; } QGroupBox::title { color: #8FA397; font-family: 'Consolas'; font-size: 11px; font-weight: bold; subcontrol-origin: margin; left: 10px; padding: 0 6px; top: -6px; }</string>
+          <string notr="true">QGroupBox { border: 1px solid #6B8E78; border-radius: 6px; margin-top: 8px; padding: 2px; } QGroupBox::title { color: #8FA397; font-family: 'Consolas'; font-size: 10px; font-weight: bold; subcontrol-origin: margin; left: 8px; padding: 0 4px; top: -4px; }</string>
          </property>
          <property name="title">
-          <string>INFERENCE</string>
+          <string>CAM1 INFERENCE</string>
          </property>
-         <layout class="QVBoxLayout" name="verticalLayout_4">
+         <layout class="QHBoxLayout" name="inferLayout">
           <property name="spacing">
-           <number>8</number>
+           <number>6</number>
           </property>
           <property name="leftMargin">
-           <number>14</number>
+           <number>8</number>
           </property>
           <property name="topMargin">
-           <number>16</number>
+           <number>10</number>
           </property>
           <property name="rightMargin">
-           <number>14</number>
+           <number>8</number>
           </property>
           <property name="bottomMargin">
-           <number>12</number>
+           <number>4</number>
           </property>
           <item>
            <widget class="QLabel" name="label_fps">
             <property name="styleSheet">
-             <string notr="true">color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;</string>
+             <string notr="true">color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 600;</string>
             </property>
             <property name="text">
              <string>FPS: --</string>
@@ -155,7 +150,7 @@
           <item>
            <widget class="QLabel" name="label_inferTime">
             <property name="styleSheet">
-             <string notr="true">color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;</string>
+             <string notr="true">color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 600;</string>
             </property>
             <property name="text">
              <string>TIME: --ms</string>
@@ -165,7 +160,7 @@
           <item>
            <widget class="QLabel" name="label_detCount">
             <property name="styleSheet">
-             <string notr="true">color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;</string>
+             <string notr="true">color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 600;</string>
             </property>
             <property name="text">
              <string>DET: --</string>
@@ -175,29 +170,102 @@
          </layout>
         </widget>
        </item>
+       <!-- CAM2 INFERENCE -->
+       <item>
+        <widget class="QGroupBox" name="groupBox_infer2">
+         <property name="styleSheet">
+          <string notr="true">QGroupBox { border: 1px solid #B8A86E; border-radius: 6px; margin-top: 8px; padding: 2px; } QGroupBox::title { color: #B8A86E; font-family: 'Consolas'; font-size: 10px; font-weight: bold; subcontrol-origin: margin; left: 8px; padding: 0 4px; top: -4px; }</string>
+         </property>
+         <property name="title">
+          <string>CAM2 INFERENCE</string>
+         </property>
+         <layout class="QHBoxLayout" name="inferLayout2">
+          <property name="spacing">
+           <number>6</number>
+          </property>
+          <property name="leftMargin">
+           <number>8</number>
+          </property>
+          <property name="topMargin">
+           <number>10</number>
+          </property>
+          <property name="rightMargin">
+           <number>8</number>
+          </property>
+          <property name="bottomMargin">
+           <number>4</number>
+          </property>
+          <item>
+           <widget class="QLabel" name="label_fps2">
+            <property name="styleSheet">
+             <string notr="true">color: #FFF3CD; font-family: 'Consolas'; font-size: 11px; font-weight: 600;</string>
+            </property>
+            <property name="text">
+             <string>FPS: --</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_inferTime2">
+            <property name="styleSheet">
+             <string notr="true">color: #FFF3CD; font-family: 'Consolas'; font-size: 11px; font-weight: 600;</string>
+            </property>
+            <property name="text">
+             <string>TIME: --ms</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_detCount2">
+            <property name="styleSheet">
+             <string notr="true">color: #FFF3CD; font-family: 'Consolas'; font-size: 11px; font-weight: 600;</string>
+            </property>
+            <property name="text">
+             <string>DET: --</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <!-- 分隔线 -->
+       <item>
+        <widget class="QFrame" name="sep3">
+         <property name="frameShape">
+          <enum>QFrame::VLine</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Sunken</enum>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">color: #2a3f5f;</string>
+         </property>
+        </widget>
+       </item>
+       <!-- CAM1 参数 -->
        <item>
         <widget class="QGroupBox" name="groupBox_camera">
          <property name="styleSheet">
-          <string notr="true">QGroupBox { border: 2px solid #6B8E78; border-radius: 8px; margin-top: 12px; } QGroupBox::title { color: #8FA397; font-family: 'Consolas'; font-size: 11px; font-weight: bold; subcontrol-origin: margin; left: 10px; padding: 0 6px; top: -6px; }</string>
+          <string notr="true">QGroupBox { border: 1px solid #6B8E78; border-radius: 6px; margin-top: 8px; padding: 2px; } QGroupBox::title { color: #8FA397; font-family: 'Consolas'; font-size: 10px; font-weight: bold; subcontrol-origin: margin; left: 8px; padding: 0 4px; top: -4px; }</string>
          </property>
          <property name="title">
-          <string>CAMERA</string>
+          <string>CAM1</string>
          </property>
-         <layout class="QVBoxLayout" name="verticalLayout_5">
+         <layout class="QHBoxLayout" name="camLayout">
           <property name="spacing">
-           <number>8</number>
+           <number>6</number>
           </property>
           <property name="leftMargin">
-           <number>14</number>
+           <number>8</number>
           </property>
           <property name="topMargin">
-           <number>16</number>
+           <number>10</number>
           </property>
           <property name="rightMargin">
-           <number>14</number>
+           <number>8</number>
           </property>
           <property name="bottomMargin">
-           <number>12</number>
+           <number>4</number>
           </property>
           <item>
            <widget class="QLabel" name="label_exp">
@@ -222,29 +290,92 @@
          </layout>
         </widget>
        </item>
+       <!-- CAM2 参数 -->
+       <item>
+        <widget class="QGroupBox" name="groupBox_camera2">
+         <property name="styleSheet">
+          <string notr="true">QGroupBox { border: 1px solid #B8A86E; border-radius: 6px; margin-top: 8px; padding: 2px; } QGroupBox::title { color: #B8A86E; font-family: 'Consolas'; font-size: 10px; font-weight: bold; subcontrol-origin: margin; left: 8px; padding: 0 4px; top: -4px; }</string>
+         </property>
+         <property name="title">
+          <string>CAM2</string>
+         </property>
+         <layout class="QHBoxLayout" name="camLayout2">
+          <property name="spacing">
+           <number>6</number>
+          </property>
+          <property name="leftMargin">
+           <number>8</number>
+          </property>
+          <property name="topMargin">
+           <number>10</number>
+          </property>
+          <property name="rightMargin">
+           <number>8</number>
+          </property>
+          <property name="bottomMargin">
+           <number>4</number>
+          </property>
+          <item>
+           <widget class="QLabel" name="label_exp2">
+            <property name="styleSheet">
+             <string notr="true">color: #FFF3CD; font-family: 'Consolas'; font-size: 11px; font-weight: 500;</string>
+            </property>
+            <property name="text">
+             <string>EXP: -- us</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_gain2">
+            <property name="styleSheet">
+             <string notr="true">color: #FFF3CD; font-family: 'Consolas'; font-size: 11px; font-weight: 500;</string>
+            </property>
+            <property name="text">
+             <string>GAIN: --</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <!-- 分隔线 -->
+       <item>
+        <widget class="QFrame" name="sep4">
+         <property name="frameShape">
+          <enum>QFrame::VLine</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Sunken</enum>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">color: #2a3f5f;</string>
+         </property>
+        </widget>
+       </item>
+       <!-- STATUS -->
        <item>
         <widget class="QGroupBox" name="groupBox_status">
          <property name="styleSheet">
-          <string notr="true">QGroupBox { border: 2px solid #6B8E78; border-radius: 8px; margin-top: 12px; } QGroupBox::title { color: #8FA397; font-family: 'Consolas'; font-size: 11px; font-weight: bold; subcontrol-origin: margin; left: 10px; padding: 0 6px; top: -6px; }</string>
+          <string notr="true">QGroupBox { border: 1px solid #6B8E78; border-radius: 6px; margin-top: 8px; padding: 2px; } QGroupBox::title { color: #8FA397; font-family: 'Consolas'; font-size: 10px; font-weight: bold; subcontrol-origin: margin; left: 8px; padding: 0 4px; top: -4px; }</string>
          </property>
          <property name="title">
           <string>STATUS</string>
          </property>
-         <layout class="QVBoxLayout" name="verticalLayout_6">
+         <layout class="QHBoxLayout" name="statusLayout">
           <property name="spacing">
-           <number>8</number>
+           <number>6</number>
           </property>
           <property name="leftMargin">
-           <number>14</number>
+           <number>8</number>
           </property>
           <property name="topMargin">
-           <number>16</number>
+           <number>10</number>
           </property>
           <property name="rightMargin">
-           <number>14</number>
+           <number>8</number>
           </property>
           <property name="bottomMargin">
-           <number>12</number>
+           <number>4</number>
           </property>
           <item>
            <widget class="QLabel" name="label_camStatus">
@@ -252,7 +383,17 @@
              <string notr="true">color: #FFCDD2; font-family: 'Consolas'; font-size: 11px; font-weight: 600;</string>
             </property>
             <property name="text">
-             <string>CAM: OFFLINE</string>
+             <string>CAM1: OFFLINE</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_camStatus2">
+            <property name="styleSheet">
+             <string notr="true">color: #FFCDD2; font-family: 'Consolas'; font-size: 11px; font-weight: 600;</string>
+            </property>
+            <property name="text">
+             <string>CAM2: OFFLINE</string>
             </property>
            </widget>
           </item>
@@ -271,6 +412,46 @@
        </item>
       </layout>
      </widget>
+    </item>
+    <!-- ===== 图像区域 ===== -->
+    <item>
+     <layout class="QHBoxLayout" name="imageLayout" stretch="1,1">
+      <property name="spacing">
+       <number>8</number>
+      </property>
+      <item>
+       <widget class="QGraphicsView" name="imageView">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>320</width>
+          <height>240</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGraphicsView" name="imageView2">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>320</width>
+          <height>240</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </item>
    </layout>
   </widget>

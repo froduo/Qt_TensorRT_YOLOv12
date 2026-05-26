@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>560</width>
-    <height>680</height>
+    <width>620</width>
+    <height>520</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,6 +18,32 @@
     QDialog {
         background-color: #0a0d14;
         color: #eef4ff;
+    }
+    QTabWidget::pane {
+        background-color: #0f1828;
+        border: 1px solid #364967;
+        border-radius: 6px;
+        padding: 8px;
+    }
+    QTabBar::tab {
+        background-color: #151d2e;
+        color: #8ab4f8;
+        border: 1px solid #364967;
+        border-bottom: none;
+        border-top-left-radius: 6px;
+        border-top-right-radius: 6px;
+        padding: 8px 18px;
+        margin-right: 2px;
+        font-weight: 600;
+        font-size: 12px;
+    }
+    QTabBar::tab:selected {
+        background-color: #0f1828;
+        color: #ffffff;
+        border-bottom: 1px solid #0f1828;
+    }
+    QTabBar::tab:hover:!selected {
+        background-color: #1a2540;
     }
     QGroupBox {
         color: #f2f6ff;
@@ -88,387 +114,707 @@
         padding: 0px;
     }
     QPushButton#btnBrowseClasses:hover { background: #3d73ce; }
+    /* 保存选项复选框样式 */
+    QCheckBox#chkSaveNG {
+        color: #FF8A80;
+        font-weight: bold;
+        background-color: #3a0a10;
+        border: 1px solid #c04a63;
+        border-radius: 4px;
+        padding: 4px 8px;
+        spacing: 6px;
+    }
+    QCheckBox#chkSaveNG::indicator {
+        width: 16px;
+        height: 16px;
+        border: 2px solid #c04a63;
+        border-radius: 3px;
+        background-color: #2a0508;
+    }
+    QCheckBox#chkSaveNG::indicator:checked {
+        background-color: #d04a63;
+        border-color: #ff8099;
+    }
+    QCheckBox#chkSaveOK {
+        color: #B9F6CA;
+        font-weight: bold;
+        background-color: #0a2a10;
+        border: 1px solid #38c47f;
+        border-radius: 4px;
+        padding: 4px 8px;
+        spacing: 6px;
+    }
+    QCheckBox#chkSaveOK::indicator {
+        width: 16px;
+        height: 16px;
+        border: 2px solid #38c47f;
+        border-radius: 3px;
+        background-color: #051a08;
+    }
+    QCheckBox#chkSaveOK::indicator:checked {
+        background-color: #38c47f;
+        border-color: #69f0ae;
+    }
    </string>
   </property>
   <layout class="QVBoxLayout" name="mainLayout">
    <property name="spacing">
-    <number>12</number>
+    <number>10</number>
    </property>
    <property name="leftMargin">
-    <number>12</number>
+    <number>10</number>
    </property>
    <property name="topMargin">
-    <number>12</number>
+    <number>10</number>
    </property>
    <property name="rightMargin">
-    <number>12</number>
+    <number>10</number>
    </property>
    <property name="bottomMargin">
-    <number>12</number>
+    <number>10</number>
    </property>
-   <!-- Display Settings -->
+   <!-- ===== QTabWidget ===== -->
    <item>
-    <widget class="QGroupBox" name="groupDisplay">
-     <property name="title">
-      <string>Display</string>
-     </property>
-     <layout class="QFormLayout" name="formLayoutDisplay">
-      <property name="verticalSpacing">
-       <number>10</number>
-      </property>
-      <item row="0" column="0">
-       <widget class="QLabel" name="lblWindowTitle">
-        <property name="text">
-         <string>WINDOW TITLE:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="QLineEdit" name="txtWindowTitle"/>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <!-- Camera Interface -->
-   <item>
-    <widget class="QGroupBox" name="groupCamera">
-     <property name="title">
-      <string>Camera Interface</string>
-     </property>
-     <layout class="QFormLayout" name="formLayoutCamera">
-      <property name="verticalSpacing">
-       <number>10</number>
-      </property>
-      <item row="0" column="0">
-       <widget class="QLabel" name="lblSN">
-        <property name="text">
-         <string>DEVICE SN:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="QLineEdit" name="txtSN"/>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="lblExp">
-        <property name="text">
-         <string>EXPOSURE (us):</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <widget class="QDoubleSpinBox" name="valExp">
-        <property name="decimals">
-         <number>0</number>
-        </property>
-        <property name="maximum">
-         <double>1000000.000000000000000</double>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="0">
-       <widget class="QLabel" name="lblGain">
-        <property name="text">
-         <string>ANALOG GAIN:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="1">
-       <widget class="QDoubleSpinBox" name="valGain">
-        <property name="decimals">
-         <number>0</number>
-        </property>
-        <property name="maximum">
-         <double>20.000000000000000</double>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <!-- Communication -->
-   <item>
-    <widget class="QGroupBox" name="groupComm">
-     <property name="title">
-      <string>Communication</string>
-     </property>
-     <layout class="QFormLayout" name="formLayoutComm">
-      <property name="verticalSpacing">
-       <number>10</number>
-      </property>
-      <item row="0" column="0">
-       <widget class="QLabel" name="lblIP">
-        <property name="text">
-         <string>SERVER IP:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="QLineEdit" name="txtIP"/>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="lblNetPort">
-        <property name="text">
-         <string>TCP PORT:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <widget class="QSpinBox" name="valNetPort">
-        <property name="maximum">
-         <number>65535</number>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="0">
-       <widget class="QLabel" name="lblSerial">
-        <property name="text">
-         <string>UART PORT:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="1">
-       <widget class="QComboBox" name="cbSerialPort"/>
-      </item>
-      <item row="3" column="0">
-       <widget class="QLabel" name="lblBaud">
-        <property name="text">
-         <string>BAUD RATE:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="1">
-       <widget class="QComboBox" name="cbBaud"/>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <!-- Image Save -->
-   <item>
-    <widget class="QGroupBox" name="groupImageSave">
-     <property name="title">
-      <string>Image Save</string>
-     </property>
-     <layout class="QFormLayout" name="formLayoutImageSave">
-      <property name="verticalSpacing">
-       <number>10</number>
-      </property>
-      <item row="0" column="0">
-       <widget class="QLabel" name="lblSaveNG">
-        <property name="text">
-         <string>SAVE OPTIONS:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <layout class="QHBoxLayout" name="saveOptionsLayout">
-        <item>
-         <widget class="QCheckBox" name="chkSaveNG">
-          <property name="text">
-           <string>SAVE ON DETECT (NG)</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QCheckBox" name="chkSaveOK">
-          <property name="text">
-           <string>SAVE NO DETECT (OK)</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <spacer name="saveOptionsSpacer">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-       </layout>
-      </item>
-      <item row="2" column="0">
-       <widget class="QLabel" name="lblSavePath">
-        <property name="text">
-         <string>SAVE PATH:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="1">
-       <layout class="QHBoxLayout" name="savePathLayout">
-        <item>
-         <widget class="QLineEdit" name="txtSavePath"/>
-        </item>
-        <item>
-         <widget class="QPushButton" name="btnBrowseSavePath">
-          <property name="maximumSize">
-           <size>
-            <width>40</width>
-            <height>16777215</height>
-           </size>
-          </property>
-          <property name="text">
-           <string>...</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item row="3" column="0">
-       <widget class="QLabel" name="lblSaveFormat">
-        <property name="text">
-         <string>SAVE FORMAT:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="1">
-       <widget class="QComboBox" name="cbSaveFormat">
-        <item>
-         <property name="text">
-          <string>jpg</string>
+    <widget class="QTabWidget" name="tabWidget">
+     <!-- ========== Tab 1: 显示 ========== -->
+     <widget class="QWidget" name="tabDisplay">
+      <attribute name="title">
+       <string>显示</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="tabDisplayLayout">
+       <item>
+        <widget class="QGroupBox" name="groupDisplay">
+         <property name="title">
+          <string>Display</string>
          </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>bmp</string>
+         <layout class="QFormLayout" name="formLayoutDisplay">
+          <property name="verticalSpacing">
+           <number>10</number>
+          </property>
+          <item row="0" column="0">
+           <widget class="QLabel" name="lblWindowTitle">
+            <property name="text">
+             <string>WINDOW TITLE:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="txtWindowTitle"/>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="tabDisplaySpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
          </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>tif</string>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>0</width>
+           <height>0</height>
+          </size>
          </property>
-        </item>
-       </widget>
-      </item>
-      <item row="4" column="0">
-       <widget class="QLabel" name="lblJpegQuality">
-        <property name="text">
-         <string>JPEG QUALITY (1-100):</string>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="1">
-       <widget class="QSpinBox" name="valJpegQuality">
-        <property name="minimum">
-         <number>1</number>
-        </property>
-        <property name="maximum">
-         <number>100</number>
-        </property>
-        <property name="value">
-         <number>95</number>
-        </property>
-       </widget>
-      </item>
-     </layout>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+     <!-- ========== Tab 2: 相机 ========== -->
+     <widget class="QWidget" name="tabCamera">
+      <attribute name="title">
+       <string>相机</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="tabCameraLayout">
+       <!-- Camera1 -->
+       <item>
+        <widget class="QGroupBox" name="groupCamera">
+         <property name="title">
+          <string>Camera Interface</string>
+         </property>
+         <layout class="QFormLayout" name="formLayoutCamera">
+          <property name="verticalSpacing">
+           <number>10</number>
+          </property>
+          <item row="0" column="0">
+           <widget class="QLabel" name="lblSN">
+            <property name="text">
+             <string>DEVICE SN:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="txtSN"/>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="lblExp">
+            <property name="text">
+             <string>EXPOSURE (us):</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QDoubleSpinBox" name="valExp">
+            <property name="decimals">
+             <number>0</number>
+            </property>
+            <property name="maximum">
+             <double>1000000.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="lblGain">
+            <property name="text">
+             <string>ANALOG GAIN:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QDoubleSpinBox" name="valGain">
+            <property name="decimals">
+             <number>0</number>
+            </property>
+            <property name="maximum">
+             <double>20.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <!-- Camera2 -->
+       <item>
+        <widget class="QGroupBox" name="groupCamera2">
+         <property name="title">
+          <string>Camera2 Interface</string>
+         </property>
+         <layout class="QFormLayout" name="formLayoutCamera2">
+          <property name="verticalSpacing">
+           <number>10</number>
+          </property>
+          <item row="0" column="0">
+           <widget class="QLabel" name="lblSN2">
+            <property name="text">
+             <string>DEVICE SN2:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="txtSN2"/>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="lblExp2">
+            <property name="text">
+             <string>EXPOSURE2 (us):</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QDoubleSpinBox" name="valExp2">
+            <property name="decimals">
+             <number>0</number>
+            </property>
+            <property name="maximum">
+             <double>1000000.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="lblGain2">
+            <property name="text">
+             <string>ANALOG GAIN2:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QDoubleSpinBox" name="valGain2">
+            <property name="decimals">
+             <number>0</number>
+            </property>
+            <property name="maximum">
+             <double>20.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="tabCameraSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>0</width>
+           <height>0</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+     <!-- ========== Tab 3: 推理 ========== -->
+     <widget class="QWidget" name="tabInference">
+      <attribute name="title">
+       <string>推理</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="tabInferenceLayout">
+       <!-- Inference Core 1 -->
+       <item>
+        <widget class="QGroupBox" name="groupAI">
+         <property name="title">
+          <string>Inference Core (Camera1)</string>
+         </property>
+         <layout class="QFormLayout" name="formLayoutAI">
+          <property name="verticalSpacing">
+           <number>10</number>
+          </property>
+          <item row="0" column="0">
+           <widget class="QLabel" name="lblEnableInference">
+            <property name="text">
+             <string>ENABLE INFERENCE:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QCheckBox" name="chkEnableInference">
+            <property name="text">
+             <string>Camera1 Inference ON</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="lblPath">
+            <property name="text">
+             <string>ENGINE PATH:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <layout class="QHBoxLayout" name="pathLayout">
+            <item>
+             <widget class="QLineEdit" name="txtEnginePath">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnBrowsePath">
+              <property name="maximumSize">
+               <size>
+                <width>40</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>...</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="lblClasses">
+            <property name="text">
+             <string>CLASSES PATH:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <layout class="QHBoxLayout" name="classesLayout">
+            <item>
+             <widget class="QLineEdit" name="txtClassesPath">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnBrowseClasses">
+              <property name="maximumSize">
+               <size>
+                <width>40</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>...</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="lblScore">
+            <property name="text">
+             <string>SCORE THRESH:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QDoubleSpinBox" name="valScoreThresh">
+            <property name="maximum">
+             <double>1.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.050000000000000</double>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <!-- Inference Core 2 -->
+       <item>
+        <widget class="QGroupBox" name="groupAI2">
+         <property name="title">
+          <string>Inference Core 2 (Camera2)</string>
+         </property>
+         <layout class="QFormLayout" name="formLayoutAI2">
+          <property name="verticalSpacing">
+           <number>10</number>
+          </property>
+          <item row="0" column="0">
+           <widget class="QLabel" name="lblEnableInference2">
+            <property name="text">
+             <string>ENABLE INFERENCE2:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QCheckBox" name="chkEnableInference2">
+            <property name="text">
+             <string>Camera2 Inference ON</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="lblPath2">
+            <property name="text">
+             <string>ENGINE PATH2:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <layout class="QHBoxLayout" name="pathLayout2">
+            <item>
+             <widget class="QLineEdit" name="txtEnginePath2">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnBrowsePath2">
+              <property name="maximumSize">
+               <size>
+                <width>40</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>...</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="lblClasses2">
+            <property name="text">
+             <string>CLASSES PATH2:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <layout class="QHBoxLayout" name="classesLayout2">
+            <item>
+             <widget class="QLineEdit" name="txtClassesPath2">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnBrowseClasses2">
+              <property name="maximumSize">
+               <size>
+                <width>40</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>...</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="lblScore2">
+            <property name="text">
+             <string>SCORE THRESH2:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QDoubleSpinBox" name="valScoreThresh2">
+            <property name="maximum">
+             <double>1.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.050000000000000</double>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="tabInferenceSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>0</width>
+           <height>0</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+     <!-- ========== Tab 4: 通信 ========== -->
+     <widget class="QWidget" name="tabComm">
+      <attribute name="title">
+       <string>通信</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="tabCommLayout">
+       <item>
+        <widget class="QGroupBox" name="groupComm">
+         <property name="title">
+          <string>Communication</string>
+         </property>
+         <layout class="QFormLayout" name="formLayoutComm">
+          <property name="verticalSpacing">
+           <number>10</number>
+          </property>
+          <item row="0" column="0">
+           <widget class="QLabel" name="lblIP">
+            <property name="text">
+             <string>SERVER IP:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="txtIP"/>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="lblNetPort">
+            <property name="text">
+             <string>TCP PORT:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QSpinBox" name="valNetPort">
+            <property name="maximum">
+             <number>65535</number>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="lblSerial">
+            <property name="text">
+             <string>UART PORT:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QComboBox" name="cbSerialPort"/>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="lblBaud">
+            <property name="text">
+             <string>BAUD RATE:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QComboBox" name="cbBaud"/>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="tabCommSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>0</width>
+           <height>0</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+     <!-- ========== Tab 5: 图像保存 ========== -->
+     <widget class="QWidget" name="tabImageSave">
+      <attribute name="title">
+       <string>图像保存</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="tabImageSaveLayout">
+       <item>
+        <widget class="QGroupBox" name="groupImageSave">
+         <property name="title">
+          <string>Image Save</string>
+         </property>
+         <layout class="QFormLayout" name="formLayoutImageSave">
+          <property name="verticalSpacing">
+           <number>10</number>
+          </property>
+          <item row="0" column="0">
+           <widget class="QLabel" name="lblSaveNG">
+            <property name="text">
+             <string>SAVE OPTIONS:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <layout class="QHBoxLayout" name="saveOptionsLayout">
+            <item>
+             <widget class="QCheckBox" name="chkSaveNG">
+              <property name="text">
+               <string>SAVE ON DETECT (NG)</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QCheckBox" name="chkSaveOK">
+              <property name="text">
+               <string>SAVE NO DETECT (OK)</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="saveOptionsSpacer">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="lblSavePath">
+            <property name="text">
+             <string>SAVE PATH:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <layout class="QHBoxLayout" name="savePathLayout">
+            <item>
+             <widget class="QLineEdit" name="txtSavePath"/>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnBrowseSavePath">
+              <property name="maximumSize">
+               <size>
+                <width>40</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>...</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="lblSaveFormat">
+            <property name="text">
+             <string>SAVE FORMAT:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QComboBox" name="cbSaveFormat">
+            <item>
+             <property name="text">
+              <string>jpg</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>bmp</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>tif</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="lblJpegQuality">
+            <property name="text">
+             <string>JPEG QUALITY (1-100):</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QSpinBox" name="valJpegQuality">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>100</number>
+            </property>
+            <property name="value">
+             <number>95</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="tabImageSaveSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>0</width>
+           <height>0</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
     </widget>
-   </item>
-   <!-- Inference Core -->
-   <item>
-    <widget class="QGroupBox" name="groupAI">
-     <property name="title">
-      <string>Inference Core</string>
-     </property>
-     <layout class="QFormLayout" name="formLayoutAI">
-      <item row="0" column="0">
-       <widget class="QLabel" name="lblPath">
-        <property name="text">
-         <string>ENGINE PATH:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <layout class="QHBoxLayout" name="pathLayout">
-        <item>
-         <widget class="QLineEdit" name="txtEnginePath">
-          <property name="readOnly">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="btnBrowsePath">
-          <property name="maximumSize">
-           <size>
-            <width>40</width>
-            <height>16777215</height>
-           </size>
-          </property>
-          <property name="text">
-           <string>...</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="lblClasses">
-        <property name="text">
-         <string>CLASSES PATH:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <layout class="QHBoxLayout" name="classesLayout">
-        <item>
-         <widget class="QLineEdit" name="txtClassesPath">
-          <property name="readOnly">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="btnBrowseClasses">
-          <property name="maximumSize">
-           <size>
-            <width>40</width>
-            <height>16777215</height>
-           </size>
-          </property>
-          <property name="text">
-           <string>...</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item row="2" column="0">
-       <widget class="QLabel" name="lblScore">
-        <property name="text">
-         <string>SCORE THRESH:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="1">
-       <widget class="QDoubleSpinBox" name="valScoreThresh">
-        <property name="maximum">
-         <double>1.000000000000000</double>
-        </property>
-        <property name="singleStep">
-         <double>0.050000000000000</double>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <!-- Spacer -->
-   <item>
-    <spacer name="verticalSpacer">
-     <property name="orientation">
-      <enum>Qt::Vertical</enum>
-     </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>0</width>
-       <height>0</height>
-      </size>
-     </property>
-    </spacer>
    </item>
    <!-- Bottom Buttons -->
    <item>

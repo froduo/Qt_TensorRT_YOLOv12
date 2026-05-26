@@ -15,6 +15,7 @@
 - 双通道输出：TCP 发送检测框结果，串口发送云台控制指令
 - 配置可视化：参数面板支持模型路径、阈值、IP、串口、相机参数
 - 在线热更新：保存参数后可立即生效，支持引擎热重载
+- **推理独立开关**：双相机推理可分别独立启用/禁用，修改后即时生效无需重启
 - 工程化细节：版本号注入、日志落盘、断线自动重连
 - **UI 优化**：莫兰迪色系界面设计，科技感菜单与状态显示
 - **图片交互**：双击缩放、鼠标拖拽平移、滚轮缩放
@@ -117,12 +118,13 @@ Camera (MVS SDK)
 
 ### 参数配置
 
-通过 `Settings -> System Config` 弹窗可配置：
+通过 `Settings -> System Config` 弹窗可配置（分 Tab 页组织）：
 
-- Camera: SN、Exposure、Gain
-- Communication: TCP IP/Port、串口、波特率
-- Inference: EnginePath、ScoreThreshold、ClassesPath
-- **类别配置**：支持导入自定义类别文件（默认加载 coco.yaml）
+- **显示 (Display)**：图像保存路径、保存选项 (OK/NG)、保存格式
+- **相机 (Camera)**：相机1/相机2 的 SN、Exposure、Gain
+- **推理 (Inference)**：相机1/相机2 的推理开关、EnginePath、ScoreThreshold、ClassesPath
+- **通信 (Communication)**：TCP IP/Port、串口、波特率
+- **图像保存 (Image Save)**：保存选项按钮样式、保存目录结构
 
 保存后会写入 `config.ini` 并立即应用到运行模块。
 
@@ -140,6 +142,11 @@ SN=SN12345678
 Exposure=5000
 Gain=0
 
+[Camera2]
+SN=SN87654321
+Exposure=5000
+Gain=0
+
 [Serial]
 Port=ttyUSB0
 Baud=115200
@@ -149,9 +156,16 @@ IP=192.168.200.172
 Port=8080
 
 [Inference]
+EnableInference=true
 EnginePath=./model/yolo12n_trt10_x86.engine
 ScoreThreshold=0.25
 ClassesPath=./model/coco.yaml
+
+[Inference2]
+EnableInference=true
+EnginePath2=./model/yolo12n_trt10_x86.engine
+ScoreThreshold2=0.25
+ClassesPath2=./model/coco.yaml
 ```
 
 ## 通信协议
@@ -190,6 +204,7 @@ ClassesPath=./model/coco.yaml
 ├── trt_yolo.h/.cpp
 ├── networkmanager.h/.cpp
 ├── serialmanager.h/.cpp
+├── saveimageworker.h/.cpp
 ├── app_config.h
 ├── logger.h
 ├── model/
@@ -209,19 +224,16 @@ ClassesPath=./model/coco.yaml
 
 ### 主界面布局
 
-- **图像显示区**：实时视频流显示，支持交互操作
+- **工具栏行**（图像显示区上方）：
+  - `START/STOP`：启动/停止相机
+  - `CAM1 INFER` / `CAM2 INFER`：相机1/2 推理状态指示
+  - `CAM1` / `CAM2`：相机1/2 连接状态指示
+  - `STATUS`：系统状态信息
+
+- **图像显示区**：双相机实时视频流并排显示，支持交互操作
   - 双击：自适应缩放
   - 拖拽：平移查看
   - 滚轮：缩放
-
-- **控制面板**：相机控制按钮
-  - `START CAMERA`：启动相机
-  - `STOP SYSTEM`：停止系统
-
-- **状态面板**（右下角三个分组）：
-  - **INFERENCE**：FPS、推理时间、检测数量
-  - **CAMERA**：曝光时间、增益
-  - **STATUS**：相机连接状态、模型加载状态
 
 - **顶部菜单**：
   - `Settings -> Offline Infer`：离线图片推理
@@ -267,6 +279,46 @@ ClassesPath=./model/coco.yaml
 - 解决方案：设置环境变量 `LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6`
 
 ## 更新日志
+
+### v1.2.0 (2026-05-26)
+
+**双相机支持**
+- 新增 Camera2 完整支持：独立采集线程、推理引擎、显示区域
+- 相机2参数配置：SN、Exposure、Gain（相机 Tab）
+- 相机2推理配置：EnginePath、ClassesPath、ScoreThreshold（推理 Tab）
+- 相机2连接状态与推理状态独立显示
+
+**推理独立开关**
+- 推理 Tab 新增 `ENABLE INFERENCE` / `ENABLE INFERENCE2` 复选框
+- 可分别独立启用/禁用相机1和相机2的推理功能
+- 修改后即时生效，无需重启程序
+- 配置持久化至 config.ini `[Inference]` / `[Inference2]` 节
+
+**启动时自动加载配置**
+- 软件启动时自动从 config.ini 加载所有参数并应用到各模块
+- 包括：推理开关（enableInference/enableInference2）、分数阈值（scoreThreshold）
+- 确保参数设置界面修改保存后，下次启动自动生效
+
+**UI 重构**
+- 工具栏从右侧列移至图像上方行布局，高度 120px
+- 移除 CONTROL PANEL 标题，精简为 START/STOP + 状态指示
+- 参数配置改为 QTabWidget 分页布局（显示/相机/推理/通信/图像保存）
+- 图像保存目录区分相机：`yyyyMMdd/相机1/OK(NG)` / `yyyyMMdd/相机2/OK(NG)`
+- 保存选项 OK/NG 按钮增加绿色/红色背景与边框样式
+
+**架构重构**
+- 将单 InferThread（双引擎/双队列）拆分为两个完全独立的 InferThread 实例
+- 相机1 → inferThread，相机2 → inferThread2，各自拥有独立的 run() 循环
+- 每个线程独立管理自己的帧队列、互斥锁、条件变量和推理引擎
+- 两个推理线程完全并行运行，互不阻塞
+
+**Bug 修复**
+- 相机1图像不更新问题修复（推理禁用时卡顿）
+- 参数对话框尺寸调整，避免保存按钮不可见
+- 帧队列深度从5增至10，减少高帧率下帧丢弃概率
+- InferThread::run() 循环增加 try-catch 异常保护
+- 增加帧处理计数日志，便于诊断帧丢失问题
+- **彻底解决相机1/相机2相互影响问题**：两个相机使用独立推理线程，完全并行执行
 
 ### v1.1.0 (2026-05-18)
 

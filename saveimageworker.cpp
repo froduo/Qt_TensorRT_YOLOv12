@@ -55,7 +55,7 @@ bool SaveImageWorker::isDiskFull() const
 #endif
 }
 
-void SaveImageWorker::onSaveImage(const QImage &img, bool hasDetection)
+void SaveImageWorker::onSaveImage(const QImage &img, bool hasDetection, int cameraId)
 {
     // 磁盘满时不保存
     if (isDiskFull()) {
@@ -79,9 +79,12 @@ void SaveImageWorker::onSaveImage(const QImage &img, bool hasDetection)
     // 确定子目录
     QString subDir = hasDetection ? "NG" : "OK";
 
-    // 构建路径：basePath/yyyyMMdd/NG/ 或 basePath/yyyyMMdd/OK/
+    // 相机标识目录
+    QString camDir = (cameraId == 2) ? "相机2" : "相机1";
+
+    // 构建路径：basePath/yyyyMMdd/相机1/NG/ 或 basePath/yyyyMMdd/相机2/OK/
     QString dateDir = QDateTime::currentDateTime().toString("yyyyMMdd");
-    QString fullDir = basePath + "/" + dateDir + "/" + subDir;
+    QString fullDir = basePath + "/" + dateDir + "/" + camDir + "/" + subDir;
 
     if (!QDir().mkpath(fullDir)) {
         LOG_WARN("[SaveImageWorker] Failed to create directory: " + fullDir);

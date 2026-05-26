@@ -40,10 +40,13 @@ MainWindow::MainWindow(QWidget *parent)
 
     LOG_INFO("Software starting... Version: " + QString(APP_VERSION_STR));
     grabThread = nullptr;
-    inferThread = new InferThread(this);
+    grabThread2 = nullptr;
+    inferThread = new InferThread(this, 1);   // 相机1
+    inferThread2 = new InferThread(this, 2);  // ⭐ 相机2独立推理线程
     serialMgr = new SerialManager(this);
     networkMgr = new NetworkManager(this);
 
+    // ===== 替换相机1的 QGraphicsView 为 ImageView =====
     QGraphicsView* oldView = ui->imageView;
     if (oldView) {
         m_imageView = new ImageView(this);
@@ -51,15 +54,35 @@ MainWindow::MainWindow(QWidget *parent)
         m_imageView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         m_imageView->setStyleSheet("background-color: #050812; border: 2px solid #4a6fa5; border-radius: 12px;");
         
-        QBoxLayout* parentLayout = qobject_cast<QBoxLayout*>(oldView->parentWidget()->layout());
-        if (parentLayout) {
-            int idx = parentLayout->indexOf(oldView);
+        // 直接使用 ui->imageLayout 替换，比 findChild 更可靠
+        QHBoxLayout* imageLayout = ui->imageLayout;
+        if (imageLayout) {
+            int idx = imageLayout->indexOf(oldView);
             if (idx >= 0) {
-                parentLayout->removeWidget(oldView);
-                parentLayout->insertWidget(idx, m_imageView);
+                imageLayout->removeWidget(oldView);
+                imageLayout->insertWidget(idx, m_imageView);
             }
         }
         delete oldView;
+    }
+
+    // ===== 替换相机2的 QGraphicsView 为 ImageView =====
+    QGraphicsView* oldView2 = ui->imageView2;
+    if (oldView2) {
+        m_imageView2 = new ImageView(this);
+        m_imageView2->setObjectName("imageView2");
+        m_imageView2->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        m_imageView2->setStyleSheet("background-color: #050812; border: 2px solid #B8A86E; border-radius: 12px;");
+        
+        QHBoxLayout* imageLayout = ui->imageLayout;
+        if (imageLayout) {
+            int idx = imageLayout->indexOf(oldView2);
+            if (idx >= 0) {
+                imageLayout->removeWidget(oldView2);
+                imageLayout->insertWidget(idx, m_imageView2);
+            }
+        }
+        delete oldView2;
     }
 
     QString titleStyle = "color: #7ad7ff; font-family: 'Consolas'; font-weight: bold; margin-left: 10px;";
@@ -74,8 +97,11 @@ MainWindow::MainWindow(QWidget *parent)
     serialLed = new QLabel(this);
     setLedStatus(serialLed, false);
 
-    statusLabel = new QLabel("CAM: OFFLINE", this);
+    statusLabel = new QLabel("CAM1: OFFLINE", this);
     statusLabel->setStyleSheet("color: #ff9fb1; font-family: 'Consolas'; font-weight: bold; padding: 0 15px;");
+
+    statusLabel2 = new QLabel("CAM2: OFFLINE", this);
+    statusLabel2->setStyleSheet("color: #ff9fb1; font-family: 'Consolas'; font-weight: bold; padding: 0 15px;");
 
     // 运行时长标签（左下角）
     runTimeLabel = new QLabel("RUN: 00:00:00", this);
@@ -101,13 +127,21 @@ MainWindow::MainWindow(QWidget *parent)
     ui->statusbar->addPermanentWidget(new QLabel("  "));
 
     ui->statusbar->addPermanentWidget(statusLabel);
+    ui->statusbar->addPermanentWidget(new QLabel("  "));
+    ui->statusbar->addPermanentWidget(statusLabel2);
     ui->statusbar->addPermanentWidget(timeLabel);
 
     ui->statusbar->setStyleSheet("QStatusBar { background-color: #151d2e; border-top: 1px solid #2e4a6a; }");
 
     connect(inferThread, &InferThread::engineLoadFailed, this, &MainWindow::onEngineLoadFailed);
+    connect(inferThread2, &InferThread::engineLoadFailed, this, &MainWindow::onEngineLoadFailed);
     connect(inferThread, &InferThread::sendResult, this, &MainWindow::updateImage);
+    connect(inferThread2, &InferThread::sendResult, this, &MainWindow::updateImage2);
+    // ⭐ 连接原始帧信号（推理禁用时使用）
+    connect(inferThread, &InferThread::sendRawFrame, this, &MainWindow::onRawFrame);
+    connect(inferThread2, &InferThread::sendRawFrame, this, &MainWindow::onRawFrame2);
     connect(&camera, &CameraController::deviceDisconnected, this, &MainWindow::onCameraDisconnected);
+    connect(&camera2, &CameraController::deviceDisconnected, this, &MainWindow::onCameraDisconnected2);
 
     connect(ui->btnOpen, &QPushButton::clicked, this, &MainWindow::onOpen);
     connect(ui->btnClose, &QPushButton::clicked, this, &MainWindow::onCloseCamera);
@@ -150,6 +184,20 @@ MainWindow::MainWindow(QWidget *parent)
         ui->label_model->setStyleSheet("color: #81C784; font-family: 'Consolas'; font-size: 11px; font-weight: 600;");
     }
 
+    // ⭐ 加载相机2推理引擎（使用独立线程）
+    LOG_INFO(QString("Loading Camera2 TensorRT engine from config: %1").arg(m_config.enginePath2));
+    if(!inferThread2->setEngine(m_config.enginePath2, m_config.classesPath2)) {
+        LOG_WARN(QString("[Cam2] Config engine path failed, trying default: ./model/yolo12n_trt10_x86.engine"));
+        inferThread2->setEngine("./model/yolo12n_trt10_x86.engine", "./model/coco.yaml");
+    }
+    inferThread2->setScoreThreshold(static_cast<float>(m_config.scoreThreshold2));
+    inferThread2->start(QThread::HighPriority);
+
+    // ⭐ 启动时应用所有推理参数（从 config.ini 加载）
+    inferThread->setScoreThreshold(static_cast<float>(m_config.scoreThreshold));
+    inferThread->setEnableInference(m_config.enableInference);
+    inferThread2->setEnableInference(m_config.enableInference2);
+
     // 启动运行计时器
     m_elapsedTimer.start();
 
@@ -174,10 +222,16 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::~MainWindow()
 {
     stopGrabbing();
+    stopGrabbing2();
     if(inferThread) {
         inferThread->requestInterruption();
         inferThread->quit();
         inferThread->wait();
+    }
+    if(inferThread2) {
+        inferThread2->requestInterruption();
+        inferThread2->quit();
+        inferThread2->wait();
     }
 
     // 清理后台保存线程
@@ -198,9 +252,9 @@ void MainWindow::stopGrabbing()
     if(grabThread)
     {
         grabThread->stop();
-        // 使用超时等待，避免 UI 线程长时间阻塞
-        if(!grabThread->wait(2000)) {
-            LOG_WARN("GrabThread did not stop within 2s, forcing termination...");
+        // ⭐ 使用短超时等待，避免 UI 线程长时间阻塞
+        if(!grabThread->wait(500)) {
+            LOG_WARN("GrabThread did not stop within 500ms, forcing termination...");
             grabThread->terminate();
             grabThread->wait(500);
         }
@@ -215,12 +269,38 @@ void MainWindow::stopGrabbing()
     updateCameraStatus(false);
 }
 
+void MainWindow::stopGrabbing2()
+{
+    if(grabThread2)
+    {
+        grabThread2->stop();
+        // ⭐ 使用短超时等待
+        if(!grabThread2->wait(500)) {
+            LOG_WARN("[Cam2] GrabThread2 did not stop within 500ms, forcing termination...");
+            grabThread2->terminate();
+            grabThread2->wait(500);
+        }
+        delete grabThread2;
+        grabThread2 = nullptr;
+    }
+
+    if(camera2.isOpen())
+    {
+        camera2.closeCamera();
+    }
+    updateCameraStatus2(false);
+}
+
 void MainWindow::onCloseCamera()
 {
     stopGrabbing();
+    stopGrabbing2();
 
     if (m_imageView) {
         m_imageView->setImage(QImage());
+    }
+    if (m_imageView2) {
+        m_imageView2->setImage(QImage());
     }
     ui->btnOpen->setEnabled(true);
     // btnOpen 恢复为默认蓝色样式（移除禁用样式覆盖）
@@ -244,71 +324,122 @@ void MainWindow::onCloseCamera()
 
 void MainWindow::onOpen()
 {
-    LOG_INFO("Attempting to open camera...");
-    if(grabThread && camera.isOpen()) {
-        QMessageBox::information(this, "Info", "Camera is already running.");
-        return;
-    }
-    if(grabThread || camera.isOpen()) {
-        LOG_WARN("Inconsistent camera state detected, cleaning up...");
-        stopGrabbing();
-    }
-    std::vector<MV_CC_DEVICE_INFO*> list;
-    if(!camera.enumDevices(list) || list.empty())
-    {
-        QMessageBox::critical(this,"Error","No camera found");
-        return;
-    }
-
-    int targetIdx = -1;
-    for(size_t i = 0; i < list.size(); ++i) {
-        QString currentSN = QString((char*)list[i]->SpecialInfo.stGigEInfo.chSerialNumber);
-        if(currentSN == m_config.cameraSN) {
-            targetIdx = static_cast<int>(i);
-            break;
+    LOG_INFO("Attempting to open cameras...");
+    
+    // ===== 打开相机1 =====
+    if(!grabThread || !camera.isOpen()) {
+        if(grabThread || camera.isOpen()) {
+            LOG_WARN("Inconsistent camera1 state detected, cleaning up...");
+            stopGrabbing();
         }
-        qDebug()<<"currentSN:"<<currentSN;
+        std::vector<MV_CC_DEVICE_INFO*> list;
+        if(!camera.enumDevices(list) || list.empty())
+        {
+            QMessageBox::critical(this,"Error","No camera found");
+            return;
+        }
+
+        int targetIdx = -1;
+        for(size_t i = 0; i < list.size(); ++i) {
+            QString currentSN = QString((char*)list[i]->SpecialInfo.stGigEInfo.chSerialNumber);
+            if(currentSN == m_config.cameraSN) {
+                targetIdx = static_cast<int>(i);
+                break;
+            }
+            qDebug()<<"currentSN:"<<currentSN;
+        }
+
+        if(targetIdx == -1) {
+            QMessageBox::warning(this, "错误", "未找到指定序列号的相机1，尝试打开首选设备");
+            targetIdx = 0;
+        }
+
+        if(!camera.openCamera(targetIdx))
+        {
+            updateCameraStatus(false);
+            LOG_ERR("Failed to open camera1 index: " + QString::number(targetIdx));
+            QMessageBox::critical(this,"Error","Open camera1 failed");
+            return;
+        }
+        LOG_INFO(QString("Camera1 opened successfully. SN: %1").arg(m_config.cameraSN));
+        updateCameraStatus(true);
+
+        camera.setExposureTime(m_config.exposure);
+        camera.setGain(m_config.gain);
+
+        camera.startGrabbing();
+        grabThread = new GrabThread(&camera);
+
+        // ⭐ 设置目标序列号用于重连
+        camera.setTargetSN(m_config.cameraSN);
+
+        // ⭐ 连接抓图线程的掉线信号
+        connect(grabThread, &GrabThread::deviceLost,
+                this, &MainWindow::onGrabThreadDeviceLost);
+
+        // ⭐ 设置推理线程指针，直接投递帧（避免 DirectConnection 阻塞 GrabThread 循环）
+        grabThread->setInferThread(inferThread);
+
+        grabThread->start(QThread::HighestPriority);
     }
 
-    if(targetIdx == -1) {
-        QMessageBox::warning(this, "错误", "未找到指定序列号的相机，尝试打开首选设备");
-        targetIdx = 0;
+    // ===== 打开相机2 =====
+    if(!grabThread2 || !camera2.isOpen()) {
+        if(grabThread2 || camera2.isOpen()) {
+            LOG_WARN("[Cam2] Inconsistent camera2 state detected, cleaning up...");
+            stopGrabbing2();
+        }
+        std::vector<MV_CC_DEVICE_INFO*> list2;
+        if(!camera2.enumDevices(list2) || list2.empty())
+        {
+            QMessageBox::critical(this,"Error","No camera2 found");
+            return;
+        }
+
+        int targetIdx2 = -1;
+        for(size_t i = 0; i < list2.size(); ++i) {
+            QString currentSN2 = QString((char*)list2[i]->SpecialInfo.stGigEInfo.chSerialNumber);
+            if(currentSN2 == m_config.cameraSN2) {
+                targetIdx2 = static_cast<int>(i);
+                break;
+            }
+            qDebug()<<"[Cam2] currentSN:"<<currentSN2;
+        }
+
+        if(targetIdx2 == -1) {
+            QMessageBox::warning(this, "错误", "未找到指定序列号的相机2，尝试打开首选设备");
+            targetIdx2 = 0;
+        }
+
+        if(!camera2.openCamera(targetIdx2))
+        {
+            updateCameraStatus2(false);
+            LOG_ERR("[Cam2] Failed to open camera2 index: " + QString::number(targetIdx2));
+            QMessageBox::critical(this,"Error","Open camera2 failed");
+            return;
+        }
+        LOG_INFO(QString("[Cam2] Camera2 opened successfully. SN: %1").arg(m_config.cameraSN2));
+        updateCameraStatus2(true);
+
+        camera2.setExposureTime(m_config.exposure2);
+        camera2.setGain(m_config.gain2);
+
+        camera2.startGrabbing();
+        grabThread2 = new GrabThread(&camera2);
+
+        camera2.setTargetSN(m_config.cameraSN2);
+
+        connect(grabThread2, &GrabThread::deviceLost,
+                this, &MainWindow::onGrabThreadDeviceLost2);
+
+        // ⭐ 设置推理线程指针，直接投递帧
+        grabThread2->setInferThread(inferThread2);
+
+        grabThread2->start(QThread::HighestPriority);
     }
 
-    if(!camera.openCamera(targetIdx))
-    {
-        updateCameraStatus(false);
-        LOG_ERR("Failed to open camera index: " + QString::number(targetIdx));
-        QMessageBox::critical(this,"Error","Open camera failed");
-        return;
-    }
-    LOG_INFO(QString("Camera opened successfully. SN: %1").arg(m_config.cameraSN));
-    updateCameraStatus(true);
-
-    camera.setExposureTime(m_config.exposure);
-    camera.setGain(m_config.gain);
-
-    camera.startGrabbing();
-    grabThread = new GrabThread(&camera);
-
-    // ⭐ 设置目标序列号用于重连
-    camera.setTargetSN(m_config.cameraSN);
-
-    // ⭐ 连接抓图线程的掉线信号
-    connect(grabThread, &GrabThread::deviceLost,
-            this, &MainWindow::onGrabThreadDeviceLost);
-
-    // ⭐ 使用 DirectConnection：InferThread 没有事件循环，QueuedConnection 无法工作
-    // onFrameReceived 仅将帧入队（O(1)操作），不会阻塞 GrabThread 的帧捕获循环
-    // InferThread 内部使用帧队列解耦，确保生产和消费互不阻塞
-    connect(grabThread, &GrabThread::sendFrame,
-            inferThread, &InferThread::onFrameReceived,
-            Qt::DirectConnection);
-
-    grabThread->start(QThread::HighestPriority);
-
+    // ===== UI 更新 =====
     ui->btnOpen->setEnabled(false);
-    // btnOpen 禁用时显示为灰色
     ui->btnOpen->setStyleSheet(
         "QPushButton {"
         "   background-color: #3a3545;"
@@ -323,7 +454,6 @@ void MainWindow::onOpen()
     );
 
     ui->btnClose->setEnabled(true);
-    // btnClose 激活时显示为醒目的红色，与禁用灰色明显区分
     ui->btnClose->setStyleSheet(
         "QPushButton {"
         "   background-color: #8b1a2b;"
@@ -344,10 +474,17 @@ void MainWindow::onOpen()
         "}"
     );
 
+    // 相机1参数显示
     ui->label_exp->setText(QString("EXP: %1 us").arg(static_cast<int>(m_config.exposure)));
     ui->label_exp->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500;");
     ui->label_gain->setText(QString("GAIN: %1").arg(m_config.gain));
     ui->label_gain->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500;");
+
+    // 相机2参数显示
+    ui->label_exp2->setText(QString("EXP: %1 us").arg(static_cast<int>(m_config.exposure2)));
+    ui->label_exp2->setStyleSheet("color: #FFF3CD; font-family: 'Consolas'; font-size: 11px; font-weight: 500;");
+    ui->label_gain2->setText(QString("GAIN: %1").arg(m_config.gain2));
+    ui->label_gain2->setStyleSheet("color: #FFF3CD; font-family: 'Consolas'; font-size: 11px; font-weight: 500;");
 }
 
 void MainWindow::onOpenImage()
@@ -396,13 +533,12 @@ void MainWindow::updateImage(QImage img, float inferTimeMs, float fps, std::vect
         LOG_WARN("[MainWindow] updateImage received null image");
         return;
     }
-    if(!m_imageView || m_imageView->size().isEmpty()) {
-        LOG_WARN("[MainWindow] updateImage: imageView not ready, size empty");
+    if(!m_imageView) {
+        LOG_WARN("[MainWindow] updateImage: imageView is null");
         return;
     }
 
     if(this->isMinimized()) {
-        // ⭐ 窗口最小化时不更新图像，但记录日志
         static bool minimizedLogged = false;
         if (!minimizedLogged) {
             LOG_INFO("[MainWindow] Window is minimized, skipping image update");
@@ -411,7 +547,6 @@ void MainWindow::updateImage(QImage img, float inferTimeMs, float fps, std::vect
         return;
     }
 
-    // ⭐ 关键日志：每30秒记录一次图像更新状态
     static QElapsedTimer updateLogTimer;
     if (!updateLogTimer.isValid()) updateLogTimer.start();
     static int updateCount = 0;
@@ -435,8 +570,8 @@ void MainWindow::updateImage(QImage img, float inferTimeMs, float fps, std::vect
     ui->label_detCount->setText(QString("DET: %1").arg(results.size()));
     ui->label_detCount->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
 
-    // 保存推理图像
-    saveInferenceImage(img, results);
+    // 保存推理图像（相机1）
+    saveInferenceImage(img, results, 1);
 
     if(!results.empty()) {
         networkMgr->sendDetectionResults(results);
@@ -451,14 +586,86 @@ void MainWindow::updateImage(QImage img, float inferTimeMs, float fps, std::vect
     }
 }
 
+// ⭐ 相机2图像更新
+void MainWindow::updateImage2(QImage img, float inferTimeMs, float fps, std::vector<Detection> results)
+{
+    if(img.isNull()) {
+        LOG_WARN("[MainWindow] updateImage2 received null image");
+        return;
+    }
+    if(!m_imageView2) {
+        LOG_WARN("[MainWindow] updateImage2: imageView2 is null");
+        return;
+    }
+
+    if(this->isMinimized()) {
+        return;
+    }
+
+    m_imageView2->setImage(img);
+
+    ui->label_fps2->setText(QString("FPS: %1").arg(QString::number(fps, 'f', 1)));
+    ui->label_fps2->setStyleSheet("color: #FFF3CD; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
+    ui->label_inferTime2->setText(QString("TIME: %1ms").arg(QString::number(inferTimeMs, 'f', 1)));
+    ui->label_inferTime2->setStyleSheet("color: #FFF3CD; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
+    ui->label_detCount2->setText(QString("DET: %1").arg(results.size()));
+    ui->label_detCount2->setStyleSheet("color: #FFF3CD; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
+
+    // 保存推理图像（相机2）
+    saveInferenceImage(img, results, 2);
+}
+
+// ⭐ 原始帧显示（相机1，推理禁用时使用）
+void MainWindow::onRawFrame(QImage img, int cameraId)
+{
+    if(img.isNull()) return;
+    if(!m_imageView) return;
+
+    if(this->isMinimized()) return;
+
+    m_imageView->setImage(img);
+
+    // 推理禁用时，状态标签显示 "--"
+    ui->label_fps->setText("FPS: --");
+    ui->label_fps->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
+    ui->label_inferTime->setText("TIME: --ms");
+    ui->label_inferTime->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
+    ui->label_detCount->setText("DET: --");
+    ui->label_detCount->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
+
+    // 保存原始帧图像（空 results = OK）
+    saveInferenceImage(img, std::vector<Detection>(), cameraId);
+}
+
+// ⭐ 原始帧显示（相机2，推理禁用时使用）
+void MainWindow::onRawFrame2(QImage img, int cameraId)
+{
+    if(img.isNull()) return;
+    if(!m_imageView2) return;
+
+    if(this->isMinimized()) return;
+
+    m_imageView2->setImage(img);
+
+    ui->label_fps2->setText("FPS: --");
+    ui->label_fps2->setStyleSheet("color: #FFF3CD; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
+    ui->label_inferTime2->setText("TIME: --ms");
+    ui->label_inferTime2->setStyleSheet("color: #FFF3CD; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
+    ui->label_detCount2->setText("DET: --");
+    ui->label_detCount2->setStyleSheet("color: #FFF3CD; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
+
+    // 保存原始帧图像（空 results = OK）
+    saveInferenceImage(img, std::vector<Detection>(), cameraId);
+}
+
 void MainWindow::onCameraDisconnected()
 {
-    LOG_WARN("Camera device disconnected unexpectedly!");
+    LOG_WARN("Camera1 device disconnected unexpectedly!");
     stopGrabbing();
     updateCameraStatus(false);
 
     // ⭐ 启动自动重连
-    ui->statusbar->showMessage("相机掉线，正在尝试自动重连...");
+    ui->statusbar->showMessage("相机1掉线，正在尝试自动重连...");
     m_reconnectAttempts = 0;
     if (!m_reconnectTimer) {
         m_reconnectTimer = new QTimer(this);
@@ -469,7 +676,23 @@ void MainWindow::onCameraDisconnected()
     onTryReconnect();
 }
 
-// ⭐ 抓图线程检测到掉线（与 deviceDisconnected 信号等效）
+void MainWindow::onCameraDisconnected2()
+{
+    LOG_WARN("[Cam2] Camera2 device disconnected unexpectedly!");
+    stopGrabbing2();
+    updateCameraStatus2(false);
+
+    ui->statusbar->showMessage("相机2掉线，正在尝试自动重连...");
+    m_reconnectAttempts2 = 0;
+    if (!m_reconnectTimer2) {
+        m_reconnectTimer2 = new QTimer(this);
+        connect(m_reconnectTimer2, &QTimer::timeout, this, &MainWindow::onTryReconnect2);
+    }
+    m_reconnectTimer2->start(RECONNECT_INTERVAL_MS);
+    onTryReconnect2();
+}
+
+// ⭐ 抓图线程检测到掉线（相机1）
 void MainWindow::onGrabThreadDeviceLost()
 {
     LOG_WARN("GrabThread detected device lost, initiating reconnect...");
@@ -486,7 +709,7 @@ void MainWindow::onGrabThreadDeviceLost()
     updateCameraStatus(false);
 
     // 启动自动重连
-    ui->statusbar->showMessage("相机掉线，正在尝试自动重连...");
+    ui->statusbar->showMessage("相机1掉线，正在尝试自动重连...");
     m_reconnectAttempts = 0;
     if (!m_reconnectTimer) {
         m_reconnectTimer = new QTimer(this);
@@ -496,17 +719,42 @@ void MainWindow::onGrabThreadDeviceLost()
     onTryReconnect();
 }
 
-// ⭐ 尝试重连
+// ⭐ 抓图线程检测到掉线（相机2）
+void MainWindow::onGrabThreadDeviceLost2()
+{
+    LOG_WARN("[Cam2] GrabThread2 detected device lost, initiating reconnect...");
+    if (grabThread2) {
+        grabThread2->stop();
+        grabThread2->wait();
+        delete grabThread2;
+        grabThread2 = nullptr;
+    }
+    if (camera2.isOpen()) {
+        camera2.closeCamera();
+    }
+    updateCameraStatus2(false);
+
+    ui->statusbar->showMessage("相机2掉线，正在尝试自动重连...");
+    m_reconnectAttempts2 = 0;
+    if (!m_reconnectTimer2) {
+        m_reconnectTimer2 = new QTimer(this);
+        connect(m_reconnectTimer2, &QTimer::timeout, this, &MainWindow::onTryReconnect2);
+    }
+    m_reconnectTimer2->start(RECONNECT_INTERVAL_MS);
+    onTryReconnect2();
+}
+
+// ⭐ 尝试重连 - 相机1
 void MainWindow::onTryReconnect()
 {
     m_reconnectAttempts++;
     LOG_INFO(QString("Reconnect attempt %1/%2...").arg(m_reconnectAttempts).arg(MAX_RECONNECT_ATTEMPTS));
-    ui->statusbar->showMessage(QString("正在重连相机... (%1/%2)")
+    ui->statusbar->showMessage(QString("正在重连相机1... (%1/%2)")
                                    .arg(m_reconnectAttempts).arg(MAX_RECONNECT_ATTEMPTS));
 
     if (camera.reconnect()) {
         // 重连成功
-        LOG_INFO("Camera reconnected successfully!");
+        LOG_INFO("Camera1 reconnected successfully!");
         m_reconnectTimer->stop();
         m_reconnectAttempts = 0;
 
@@ -518,14 +766,11 @@ void MainWindow::onTryReconnect()
         grabThread = new GrabThread(&camera);
         connect(grabThread, &GrabThread::deviceLost,
                 this, &MainWindow::onGrabThreadDeviceLost);
-        // ⭐ 使用 DirectConnection：onFrameReceived 仅入队，不阻塞 GrabThread
-        connect(grabThread, &GrabThread::sendFrame,
-                inferThread, &InferThread::onFrameReceived,
-                Qt::DirectConnection);
+        grabThread->setInferThread(inferThread);
         grabThread->start(QThread::HighestPriority);
 
         updateCameraStatus(true);
-        ui->statusbar->showMessage("相机重连成功", 3000);
+        ui->statusbar->showMessage("相机1重连成功", 3000);
         ui->btnOpen->setEnabled(false);
         ui->btnClose->setEnabled(true);
         return;
@@ -533,15 +778,51 @@ void MainWindow::onTryReconnect()
 
     // 重连失败
     if (m_reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-        // 超过最大尝试次数，放弃
         m_reconnectTimer->stop();
         m_reconnectAttempts = 0;
-        LOG_ERR("Max reconnect attempts reached, giving up.");
-        ui->statusbar->showMessage("相机重连失败，请手动点击 START CAMERA", 5000);
+        LOG_ERR("Max reconnect attempts reached for camera1, giving up.");
+        ui->statusbar->showMessage("相机1重连失败，请手动点击 START CAMERA", 5000);
         ui->btnOpen->setEnabled(true);
         ui->btnClose->setEnabled(false);
         QMessageBox::warning(this, "重连失败",
-                             QString("已尝试 %1 次重连均失败，请检查相机连接后手动启动。").arg(MAX_RECONNECT_ATTEMPTS));
+                             QString("相机1已尝试 %1 次重连均失败，请检查相机连接后手动启动。").arg(MAX_RECONNECT_ATTEMPTS));
+    }
+}
+
+// ⭐ 尝试重连 - 相机2
+void MainWindow::onTryReconnect2()
+{
+    m_reconnectAttempts2++;
+    LOG_INFO(QString("[Cam2] Reconnect attempt %1/%2...").arg(m_reconnectAttempts2).arg(MAX_RECONNECT_ATTEMPTS));
+    ui->statusbar->showMessage(QString("正在重连相机2... (%1/%2)")
+                                   .arg(m_reconnectAttempts2).arg(MAX_RECONNECT_ATTEMPTS));
+
+    if (camera2.reconnect()) {
+        LOG_INFO("[Cam2] Camera2 reconnected successfully!");
+        m_reconnectTimer2->stop();
+        m_reconnectAttempts2 = 0;
+
+        camera2.setExposureTime(m_config.exposure2);
+        camera2.setGain(m_config.gain2);
+
+        grabThread2 = new GrabThread(&camera2);
+        connect(grabThread2, &GrabThread::deviceLost,
+                this, &MainWindow::onGrabThreadDeviceLost2);
+        grabThread2->setInferThread(inferThread2);
+        grabThread2->start(QThread::HighestPriority);
+
+        updateCameraStatus2(true);
+        ui->statusbar->showMessage("相机2重连成功", 3000);
+        return;
+    }
+
+    if (m_reconnectAttempts2 >= MAX_RECONNECT_ATTEMPTS) {
+        m_reconnectTimer2->stop();
+        m_reconnectAttempts2 = 0;
+        LOG_ERR("[Cam2] Max reconnect attempts reached, giving up.");
+        ui->statusbar->showMessage("相机2重连失败，请检查相机连接后手动启动", 5000);
+        QMessageBox::warning(this, "重连失败",
+                             QString("相机2已尝试 %1 次重连均失败，请检查相机连接后手动启动。").arg(MAX_RECONNECT_ATTEMPTS));
     }
 }
 
@@ -561,6 +842,8 @@ void MainWindow::onSetParams()
     {
         QString oldEnginePath = m_config.enginePath;
         QString oldClassesPath = m_config.classesPath;
+        QString oldEnginePath2 = m_config.enginePath2;
+        QString oldClassesPath2 = m_config.classesPath2;
         m_config = dlg.getUpdatedConfig();
         m_config.save();
         LOG_INFO("System parameters updated and saved to config.ini");
@@ -568,13 +851,24 @@ void MainWindow::onSetParams()
         // 更新主界面标题
         this->setWindowTitle(m_config.windowTitle);
 
+        // 更新相机1参数
         if(camera.isOpen()){
             camera.setExposureTime(m_config.exposure);
             camera.setGain(m_config.gain);
             ui->label_exp->setText(QString("EXP: %1 us").arg(static_cast<int>(m_config.exposure)));
-        ui->label_exp->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500;");
-        ui->label_gain->setText(QString("GAIN: %1").arg(m_config.gain));
-        ui->label_gain->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500;");
+            ui->label_exp->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500;");
+            ui->label_gain->setText(QString("GAIN: %1").arg(m_config.gain));
+            ui->label_gain->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 11px; font-weight: 500;");
+        }
+
+        // 更新相机2参数
+        if(camera2.isOpen()){
+            camera2.setExposureTime(m_config.exposure2);
+            camera2.setGain(m_config.gain2);
+            ui->label_exp2->setText(QString("EXP: %1 us").arg(static_cast<int>(m_config.exposure2)));
+            ui->label_exp2->setStyleSheet("color: #FFF3CD; font-family: 'Consolas'; font-size: 11px; font-weight: 500;");
+            ui->label_gain2->setText(QString("GAIN: %1").arg(m_config.gain2));
+            ui->label_gain2->setStyleSheet("color: #FFF3CD; font-family: 'Consolas'; font-size: 11px; font-weight: 500;");
         }
 
         serialMgr->closePort();
@@ -583,6 +877,7 @@ void MainWindow::onSetParams()
         networkMgr->disconnect();
         networkMgr->connectToServer(m_config.netIp, m_config.netPort);
 
+        // 更新相机1推理引擎
         if (oldEnginePath != m_config.enginePath) {
             inferThread->stop();
             inferThread->wait();
@@ -599,7 +894,26 @@ void MainWindow::onSetParams()
             inferThread->setClasses(m_config.classesPath);
             ui->statusbar->showMessage("类别配置已更新", 3000);
         }
-        inferThread->setScoreThreshold(m_config.scoreThreshold);
+        inferThread->setScoreThreshold(static_cast<float>(m_config.scoreThreshold));
+
+        // ⭐ 应用推理开关（立即生效，无需重启）
+        inferThread->setEnableInference(m_config.enableInference);
+        inferThread2->setEnableInference(m_config.enableInference2);
+
+        // 更新相机2推理引擎（使用独立线程）
+        if (oldEnginePath2 != m_config.enginePath2) {
+            inferThread2->stop();
+            inferThread2->wait();
+            if(inferThread2->setEngine(m_config.enginePath2, m_config.classesPath2)) {
+                inferThread2->start();
+                ui->statusbar->showMessage("相机2推理引擎已重新加载", 3000);
+            }
+        } else if (oldClassesPath2 != m_config.classesPath2) {
+            inferThread2->setClasses(m_config.classesPath2);
+            ui->statusbar->showMessage("相机2类别配置已更新", 3000);
+        }
+        inferThread2->setScoreThreshold(static_cast<float>(m_config.scoreThreshold2));
+
         QMessageBox::information(this, "成功", "参数已保存并实时应用");
     }
 }
@@ -631,16 +945,16 @@ void MainWindow::updateCameraStatus(bool connected)
 {
     if(connected)
     {
-        statusLabel->setText("CAM: ONLINE");
+        statusLabel->setText("CAM1: ONLINE");
         statusLabel->setStyleSheet("color: #8dffbf; font-family: 'Consolas'; font-weight: bold; padding: 0 15px;");
-        ui->label_camStatus->setText("CAM: ONLINE");
+        ui->label_camStatus->setText("CAM1: ONLINE");
         ui->label_camStatus->setStyleSheet("color: #81C784; font-family: 'Consolas'; font-size: 11px; font-weight: bold;");
     }
     else
     {
-        statusLabel->setText("CAM: OFFLINE");
+        statusLabel->setText("CAM1: OFFLINE");
         statusLabel->setStyleSheet("color: #FFCDD2; font-family: 'Consolas'; font-weight: bold; padding: 0 15px;");
-        ui->label_camStatus->setText("CAM: OFFLINE");
+        ui->label_camStatus->setText("CAM1: OFFLINE");
         ui->label_camStatus->setStyleSheet("color: #FFCDD2; font-family: 'Consolas'; font-size: 11px; font-weight: bold;");
         ui->label_fps->setText("FPS: --");
         ui->label_fps->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
@@ -648,6 +962,30 @@ void MainWindow::updateCameraStatus(bool connected)
         ui->label_inferTime->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
         ui->label_detCount->setText("DET: --");
         ui->label_detCount->setStyleSheet("color: #E8F5E9; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
+    }
+}
+
+void MainWindow::updateCameraStatus2(bool connected)
+{
+    if(connected)
+    {
+        statusLabel2->setText("CAM2: ONLINE");
+        statusLabel2->setStyleSheet("color: #8dffbf; font-family: 'Consolas'; font-weight: bold; padding: 0 15px;");
+        ui->label_camStatus2->setText("CAM2: ONLINE");
+        ui->label_camStatus2->setStyleSheet("color: #81C784; font-family: 'Consolas'; font-size: 11px; font-weight: bold;");
+    }
+    else
+    {
+        statusLabel2->setText("CAM2: OFFLINE");
+        statusLabel2->setStyleSheet("color: #FFCDD2; font-family: 'Consolas'; font-weight: bold; padding: 0 15px;");
+        ui->label_camStatus2->setText("CAM2: OFFLINE");
+        ui->label_camStatus2->setStyleSheet("color: #FFCDD2; font-family: 'Consolas'; font-size: 11px; font-weight: bold;");
+        ui->label_fps2->setText("FPS: --");
+        ui->label_fps2->setStyleSheet("color: #FFF3CD; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
+        ui->label_inferTime2->setText("TIME: --ms");
+        ui->label_inferTime2->setStyleSheet("color: #FFF3CD; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
+        ui->label_detCount2->setText("DET: --");
+        ui->label_detCount2->setStyleSheet("color: #FFF3CD; font-family: 'Consolas'; font-size: 12px; font-weight: 600;");
     }
 }
 
@@ -683,7 +1021,7 @@ void MainWindow::on_actionversion_triggered()
     showAbout();
 }
 
-void MainWindow::saveInferenceImage(const QImage &img, const std::vector<Detection> &results)
+void MainWindow::saveInferenceImage(const QImage &img, const std::vector<Detection> &results, int cameraId)
 {
     // 如果磁盘已满（<1G），不保存
     if (m_diskFull) {
@@ -706,8 +1044,8 @@ void MainWindow::saveInferenceImage(const QImage &img, const std::vector<Detecti
         // 同步保存参数到后台线程
         m_saveWorker->setSaveParams(m_config.savePath, m_config.saveFormat, m_config.jpegQuality);
         m_saveWorker->setDiskFull(m_diskFull);
-        // 发射信号，后台线程执行保存
-        emit m_saveWorker->onSaveImage(img, hasDetection);
+        // 发射信号，后台线程执行保存（携带相机ID）
+        emit m_saveWorker->onSaveImage(img, hasDetection, cameraId);
     }
 }
 
