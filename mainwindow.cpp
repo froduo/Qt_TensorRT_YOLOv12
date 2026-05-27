@@ -303,8 +303,26 @@ void MainWindow::onCloseCamera()
         m_imageView2->setImage(QImage());
     }
     ui->btnOpen->setEnabled(true);
-    // btnOpen 恢复为默认蓝色样式（移除禁用样式覆盖）
-    ui->btnOpen->setStyleSheet("");
+    // btnOpen 恢复为默认蓝色样式（与 style.qss 中的 QPushButton 默认样式一致）
+    ui->btnOpen->setStyleSheet(
+        "QPushButton {"
+        "   background-color: #3a7bc8;"
+        "   border: 1px solid #5a9be8;"
+        "   border-radius: 8px;"
+        "   color: #ffffff;"
+        "   padding: 10px 16px;"
+        "   font-weight: 600;"
+        "   font-size: 12px;"
+        "   min-height: 38px;"
+        "}"
+        "QPushButton:hover {"
+        "   background-color: #4a8bd8;"
+        "   border-color: #7ab8f5;"
+        "}"
+        "QPushButton:pressed {"
+        "   background-color: #1e4a96;"
+        "}"
+    );
 
     ui->btnClose->setEnabled(false);
     // btnClose 禁用时显示为灰色，与激活状态的红色明显区分

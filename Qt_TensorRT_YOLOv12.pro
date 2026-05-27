@@ -50,13 +50,20 @@ QT += widgets
 QT += serialport network
 CONFIG += c++17
 
-INCLUDEPATH +=/usr/local/cuda/include \
-    /usr/local/TensorRT-10.3/include \
-    /usr/local/include/opencv4
+# ==========================================
+# ARM64 (aarch64) 环境路径配置
+# TensorRT 8.5.2 (apt 安装)
+# CUDA 11.4
+# OpenCV 4.5.4
+# MVS SDK (aarch64)
+# ==========================================
+INCLUDEPATH += /usr/local/cuda/include \
+    /usr/include/aarch64-linux-gnu \
+    /usr/include/opencv4
 
 LIBS += \
     -L/usr/local/cuda/lib64 \
-    -L/usr/local/TensorRT-10.3/targets/x86_64-linux-gnu/lib \
+    -L/usr/lib/aarch64-linux-gnu \
     -lopencv_core \
     -lopencv_imgproc \
     -lopencv_highgui \
@@ -69,25 +76,25 @@ LIBS += \
     -lcudart
 
 INCLUDEPATH += /opt/MVS/include
-LIBS += -L/opt/MVS/lib/64 -lMvCameraControl
+LIBS += -L/opt/MVS/lib/aarch64 -lMvCameraControl
 
 DISTFILES += \
-    model/yolo12n_trt10_x86.engine
+    model/yolo12n_trt8.5.2_arm64.engine
 
     # ==========================================
-    # ⭐ 新增：编译后自动复制模型文件到构建目录
+    # ⭐ 编译后自动复制模型文件到构建目录
     # ==========================================
 
     # 定义源文件路径 (项目目录下的 model/xxx)
-    MODEL_SOURCE = $$PWD/model/yolo12n_trt10_x86.engine
+    MODEL_SOURCE = $$PWD/model/yolo12n_trt8.5.2_arm64.engine
 
     # 定义目标文件夹 (构建目录下的 model 文件夹)
     MODEL_DEST_DIR = $$OUT_PWD/model
 
     # Linux/Unix 下的复制命令：
     # 1. mkdir -p 创建目录 (如果不存在)
-    # 2. cp -f 强制复制文件
-    QMAKE_POST_LINK += mkdir -p $$MODEL_DEST_DIR && cp -f $$MODEL_SOURCE $$MODEL_DEST_DIR
+    # 2. 仅当源和目标不同时才 cp，避免 in-source build 时 cp 自身报错
+    QMAKE_POST_LINK += mkdir -p $$MODEL_DEST_DIR && test "$$MODEL_SOURCE" = "$$MODEL_DEST_DIR/$$basename(MODEL_SOURCE)" || cp -f $$MODEL_SOURCE $$MODEL_DEST_DIR
 
 # --- 自动生成版本号逻辑 ---
 

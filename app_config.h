@@ -38,13 +38,13 @@ struct AppConfig {
     // 推理参数 - 相机1
     bool enableInference = true;   // 是否启用推理
     double scoreThreshold = 0.25; // 默认得分阈值
-    QString enginePath = "./model/yolo12n_trt10_x86.engine"; // 推理引擎路径
+    QString enginePath = "./model/yolo12n_trt8.5.2_arm64.engine"; // 推理引擎路径 (ARM64)
     QString classesPath = "./model/coco.yaml"; // 检测类别文件路径
 
     // 推理参数 - 相机2
     bool enableInference2 = true;  // 是否启用推理
     double scoreThreshold2 = 0.25;
-    QString enginePath2 = "./model/yolo12n_trt10_x86.engine";
+    QString enginePath2 = "./model/yolo12n_trt8.5.2_arm64.engine";
     QString classesPath2 = "./model/coco.yaml";
 
     // 保存到文件
@@ -128,12 +128,12 @@ struct AppConfig {
         jpegQuality = s.value("ImageSave/JpegQuality", 95).toInt();
 
         enableInference = s.value("Inference/EnableInference", true).toBool();
-        enginePath = s.value("Inference/EnginePath", "./model/yolo12n_trt10_x86.engine").toString();
+        enginePath = s.value("Inference/EnginePath", "./model/yolo12n_trt8.5.2_arm64.engine").toString();
         scoreThreshold = s.value("Inference/ScoreThreshold", 0.25).toDouble();
         classesPath = s.value("Inference/ClassesPath", "./model/coco.yaml").toString();
 
         enableInference2 = s.value("Inference2/EnableInference", true).toBool();
-        enginePath2 = s.value("Inference2/EnginePath", "./model/yolo12n_trt10_x86.engine").toString();
+        enginePath2 = s.value("Inference2/EnginePath", "./model/yolo12n_trt8.5.2_arm64.engine").toString();
         scoreThreshold2 = s.value("Inference2/ScoreThreshold", 0.25).toDouble();
         classesPath2 = s.value("Inference2/ClassesPath", "./model/coco.yaml").toString();
     }

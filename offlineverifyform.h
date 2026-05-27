@@ -35,9 +35,6 @@ private:
     void runOfflineInfer();
     void drawDetections(cv::Mat& img, const std::vector<Detection>& results);
     QString classNameById(int classId) const;
-    static QString resolveTrtexecPath();
-    void augmentTrtexecLibraryPath(QProcessEnvironment& env) const;
-
     cv::Mat m_offlineImage;
     QString m_offlineImagePath;
     TrtYolo* m_offlineTrtYolo = nullptr;
@@ -48,8 +45,6 @@ private:
     bool m_offlineCudaReady = false;
     std::vector<std::string> m_offlineClassNames;
     QString m_offlineLoadedModelPath;
-    QProcess* m_trtexec = nullptr;
-    QString m_trtexecEnginePath;
 
     QString m_lastModelDir;
     QString m_lastImageDir;
@@ -69,9 +64,6 @@ private slots:
     void handleOnnxToEngine();
     void handleExportLog();
     void handleDeviceChanged(int index);
-    void onTrtexecFinished(int exitCode, QProcess::ExitStatus status);
-    void onTrtexecReadyRead();
-    void onTrtexecError(QProcess::ProcessError err);
 };
 
 #endif // OFFLINEVERIFYFORM_H

@@ -11,8 +11,11 @@
 #include <QSettings>
 #include <QDebug>
 #include <QMainWindow>
+#include <QApplication>
 #include <opencv2/dnn.hpp>
 #include <cuda_runtime_api.h>
+#include <iostream>
+#include <sstream>
 
 static const std::vector<std::string> kOfflineClassNames = {
     "person","bicycle","car","motorcycle","airplane","bus","train","truck",
@@ -100,12 +103,6 @@ OfflineVerifyForm::~OfflineVerifyForm()
     if (m_offlineLogger) {
         delete m_offlineLogger;
         m_offlineLogger = nullptr;
-    }
-    if (m_trtexec) {
-        m_trtexec->kill();
-        m_trtexec->waitForFinished(3000);
-        delete m_trtexec;
-        m_trtexec = nullptr;
     }
     delete ui;
 }
@@ -373,48 +370,58 @@ void OfflineVerifyForm::handleOnnxToEngine()
         QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
     useFP16 = (reply == QMessageBox::Yes);
 
-    QString trtexec = resolveTrtexecPath();
-    if (trtexec.isEmpty()) {
-        QMessageBox::critical(this, "错误", "未找到 trtexec，请确保 TensorRT 已安装且 trtexec 在 PATH 中");
-        return;
-    }
-
-    QStringList args;
-    args << "--onnx=" + onnxPath
-         << "--saveEngine=" + enginePath
-         << "--verbose";
-    if (useFP16) {
-        args << "--fp16";
-    }
-
     appendLog("[信息] 开始转换 ONNX → Engine");
     appendLog(QString("  ONNX: %1").arg(onnxPath));
     appendLog(QString("  Engine: %1").arg(enginePath));
     appendLog(QString("  精度: %1").arg(useFP16 ? "FP16" : "FP32"));
-    appendLog(QString("  trtexec: %1").arg(trtexec));
+    QApplication::processEvents();
 
-    if (m_trtexec) {
-        m_trtexec->kill();
-        m_trtexec->waitForFinished(3000);
-        delete m_trtexec;
+    // ⭐ 使用 TrtYolo::buildEngineFromOnnx() 替代 trtexec
+    // 创建一个临时 logger 用于构建过程
+    TrtLogger buildLogger;
+
+    // 重定向 stdout/stderr 到 stringstream，以便捕获构建日志
+    std::stringstream buildLogStream;
+    std::streambuf* oldCout = std::cout.rdbuf(buildLogStream.rdbuf());
+    std::streambuf* oldCerr = std::cerr.rdbuf(buildLogStream.rdbuf());
+
+    bool ok = TrtYolo::buildEngineFromOnnx(
+        onnxPath.toStdString(),
+        enginePath.toStdString(),
+        buildLogger,
+        640,      // inputW
+        640,      // inputH
+        1,        // maxBatchSize
+        useFP16); // useFP16
+
+    // 恢复 stdout/stderr
+    std::cout.rdbuf(oldCout);
+    std::cerr.rdbuf(oldCerr);
+
+    // 将捕获的构建日志输出到 UI 日志面板
+    QString buildLog = QString::fromStdString(buildLogStream.str());
+    if (!buildLog.isEmpty()) {
+        QStringList lines = buildLog.split('\n', QString::SkipEmptyParts);
+        for (const QString& line : lines) {
+            appendLog("  " + line.trimmed());
+        }
+        QApplication::processEvents();
     }
-    m_trtexec = new QProcess(this);
-    m_trtexecEnginePath = enginePath;
 
-    connect(m_trtexec, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
-            this, &OfflineVerifyForm::onTrtexecFinished);
-    connect(m_trtexec, &QProcess::readyReadStandardOutput,
-            this, &OfflineVerifyForm::onTrtexecReadyRead);
-    connect(m_trtexec, &QProcess::readyReadStandardError,
-            this, &OfflineVerifyForm::onTrtexecReadyRead);
-    connect(m_trtexec, qOverload<QProcess::ProcessError>(&QProcess::errorOccurred),
-            this, &OfflineVerifyForm::onTrtexecError);
-
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    augmentTrtexecLibraryPath(env);
-    m_trtexec->setProcessEnvironment(env);
-
-    m_trtexec->start(trtexec, args);
+    if (ok) {
+        appendLog("[成功] ONNX → Engine 转换完成");
+        appendLog(QString("  输出: %1").arg(enginePath));
+        ui->editModelPath->setText(enginePath);
+        saveLastModelPath(enginePath);
+    } else {
+        appendLog("[失败] ONNX → Engine 转换失败，请查看上方错误日志");
+        QMessageBox::critical(this, "错误",
+            "ONNX → Engine 转换失败，请查看日志了解详情。\n\n"
+            "可能的原因：\n"
+            "1. ONNX 模型包含不支持的算子\n"
+            "2. 模型输入/输出形状不匹配\n"
+            "3. 显存不足");
+    }
 }
 
 void OfflineVerifyForm::handleExportLog()
@@ -465,45 +472,6 @@ void OfflineVerifyForm::handleDeviceChanged(int index)
     m_offlineCpuReady = false;
     m_offlineCudaReady = false;
     appendLog("[信息] 切换后端至: " + backendName());
-}
-
-void OfflineVerifyForm::onTrtexecFinished(int exitCode, QProcess::ExitStatus status)
-{
-    if (status == QProcess::NormalExit && exitCode == 0) {
-        appendLog("[成功] ONNX → Engine 转换完成");
-        appendLog(QString("  输出: %1").arg(m_trtexecEnginePath));
-        ui->editModelPath->setText(m_trtexecEnginePath);
-        saveLastModelPath(m_trtexecEnginePath);
-    } else {
-        appendLog(QString("[失败] trtexec 退出码: %1").arg(exitCode));
-    }
-}
-
-void OfflineVerifyForm::onTrtexecReadyRead()
-{
-    QString output = QString::fromUtf8(m_trtexec->readAllStandardOutput());
-    if (!output.isEmpty()) {
-        QStringList lines = output.split('\n', Qt::SkipEmptyParts);
-        for (const QString& line : lines) {
-            if (line.contains("error", Qt::CaseInsensitive) ||
-                line.contains("warning", Qt::CaseInsensitive) ||
-                line.contains("success", Qt::CaseInsensitive) ||
-                line.contains("finished", Qt::CaseInsensitive) ||
-                line.contains("layer", Qt::CaseInsensitive)) {
-                appendLog("[trtexec] " + line.trimmed());
-            }
-        }
-    }
-    QString errOutput = QString::fromUtf8(m_trtexec->readAllStandardError());
-    if (!errOutput.isEmpty()) {
-        appendLog("[trtexec-err] " + errOutput.trimmed());
-    }
-}
-
-void OfflineVerifyForm::onTrtexecError(QProcess::ProcessError err)
-{
-    Q_UNUSED(err);
-    appendLog("[错误] trtexec 进程出错: " + m_trtexec->errorString());
 }
 
 bool OfflineVerifyForm::loadOfflineModel()
@@ -793,50 +761,3 @@ void OfflineVerifyForm::drawDetections(cv::Mat& img, const std::vector<Detection
     }
 }
 
-QString OfflineVerifyForm::resolveTrtexecPath()
-{
-    QString pathEnv = qEnvironmentVariable("PATH");
-    QStringList dirs = pathEnv.split(':', Qt::SkipEmptyParts);
-    for (const QString& dir : dirs) {
-        QFileInfo fi(dir + "/trtexec");
-        if (fi.exists() && fi.isExecutable()) {
-            return fi.absoluteFilePath();
-        }
-    }
-
-    QStringList candidates = {
-        "/usr/local/TensorRT-10.3/bin/trtexec",
-        "/usr/local/TensorRT-10.0/bin/trtexec",
-        "/usr/local/TensorRT-8.6/bin/trtexec",
-        "/usr/local/TensorRT-8.5/bin/trtexec",
-        "/usr/local/TensorRT-8.4/bin/trtexec",
-        "/usr/local/TensorRT/bin/trtexec",
-        "/opt/TensorRT/bin/trtexec"
-    };
-    for (const QString& path : candidates) {
-        QFileInfo fi(path);
-        if (fi.exists() && fi.isExecutable()) {
-            return fi.absoluteFilePath();
-        }
-    }
-
-    return QString();
-}
-
-void OfflineVerifyForm::augmentTrtexecLibraryPath(QProcessEnvironment& env) const
-{
-    QStringList libCandidates = {
-        "/usr/local/TensorRT-10.3/lib",
-        "/usr/local/TensorRT-10.3/targets/x86_64-linux-gnu/lib",
-        "/usr/local/TensorRT/lib",
-        "/usr/local/cuda/lib64"
-    };
-    QString existing = env.value("LD_LIBRARY_PATH", "");
-    QStringList paths = existing.split(':', Qt::SkipEmptyParts);
-    for (const QString& libPath : libCandidates) {
-        if (QDir(libPath).exists() && !paths.contains(libPath)) {
-            paths.prepend(libPath);
-        }
-    }
-    env.insert("LD_LIBRARY_PATH", paths.join(':'));
-}

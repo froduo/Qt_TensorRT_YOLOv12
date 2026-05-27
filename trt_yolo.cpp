@@ -2,6 +2,7 @@
 #include <fstream>
 #include <iostream>
 #include <opencv2/dnn.hpp>
+#include <NvOnnxParser.h>
 
 using namespace nvinfer1;
 
@@ -27,7 +28,11 @@ static const std::vector<std::string> defaultClassNames = {
 TrtYolo::TrtYolo(const std::string& enginePath, ILogger& logger, const std::string& classesPath)
     : logger(logger)
 {
-    loadEngine(enginePath);
+    bool ok = loadEngine(enginePath);
+    if (!ok) {
+        m_lastError = "Failed to load engine: " + enginePath;
+        return;
+    }
     if (!classesPath.empty()) {
         loadClasses(classesPath);
     } else {
@@ -37,7 +42,7 @@ TrtYolo::TrtYolo(const std::string& enginePath, ILogger& logger, const std::stri
 
 TrtYolo::~TrtYolo()
 {
-    // TensorRT 10.x 显式要求使用 delete 释放内存
+    // TensorRT 8.x 使用 delete 释放内存
     if (context) delete context;
     if (engine) delete engine;
     if (runtime) delete runtime;
@@ -59,7 +64,10 @@ size_t TrtYolo::getSizeByDim(const Dims& dims)
 bool TrtYolo::loadEngine(const std::string& enginePath)
 {
     std::ifstream file(enginePath, std::ios::binary);
-    if (!file.is_open()) return false;
+    if (!file.is_open()) {
+        m_lastError = "Cannot open engine file: " + enginePath;
+        return false;
+    }
 
     file.seekg(0, std::ios::end);
     size_t size = file.tellg();
@@ -70,35 +78,54 @@ bool TrtYolo::loadEngine(const std::string& enginePath)
     file.close();
 
     runtime = createInferRuntime(logger);
+    if (!runtime) {
+        m_lastError = "Failed to create TensorRT runtime";
+        return false;
+    }
+
     engine = runtime->deserializeCudaEngine(engineData.data(), size);
+    if (!engine) {
+        m_lastError = "Failed to deserialize TensorRT engine.\n"
+                      "The engine file may be built with a different TensorRT version or for a different architecture.\n"
+                      "Expected: TensorRT 8.5.2 on aarch64\n"
+                      "File: " + enginePath;
+        return false;
+    }
+
     context = engine->createExecutionContext();
+    if (!context) {
+        m_lastError = "Failed to create TensorRT execution context";
+        delete engine;
+        engine = nullptr;
+        return false;
+    }
 
-    // --- TensorRT 10.x 新版 I/O 处理逻辑 ---
-    int nbIOTensors = engine->getNbIOTensors(); // 代替 getNbBindings
-    for (int i = 0; i < nbIOTensors; i++)
+    // --- TensorRT 8.x 兼容的 I/O 处理逻辑 ---
+    int nbBindings = engine->getNbBindings();
+    for (int i = 0; i < nbBindings; i++)
     {
-        const char* tensorName = engine->getIOTensorName(i); // 代替 getBindingName
-        TensorIOMode mode = engine->getTensorIOMode(tensorName); // 代替 bindingIsInput
+        const char* bindingName = engine->getBindingName(i);
+        bool isInput = engine->bindingIsInput(i);
 
-        if (mode == TensorIOMode::kINPUT) {
+        if (isInput) {
             inputIndex = i;
-            inputTensorName = tensorName; // 记录名称，V3 API 需要
-            std::cout << "Input Tensor [" << i << "]: " << tensorName << std::endl;
+            inputTensorName = bindingName;
+            std::cout << "Input Binding [" << i << "]: " << bindingName << std::endl;
         } else {
             outputIndex = i;
-            outputTensorName = tensorName; // 记录名称
-            std::cout << "Output Tensor [" << i << "]: " << tensorName << std::endl;
+            outputTensorName = bindingName;
+            std::cout << "Output Binding [" << i << "]: " << bindingName << std::endl;
         }
     }
 
-    // 设置输入维度 (代替 setBindingDimensions)
-    context->setInputShape(inputTensorName.c_str(), Dims4(1, 3, inputH, inputW));
+    // 设置输入维度 (TensorRT 8.x 使用 setBindingDimensions)
+    context->setBindingDimensions(inputIndex, Dims4(1, 3, inputH, inputW));
 
     // 计算输入输出大小
     inputSize = 1 * 3 * inputH * inputW * sizeof(float);
 
-    // 获取输出维度 (代替 getBindingDimensions)
-    auto outDims = engine->getTensorShape(outputTensorName.c_str());
+    // 获取输出维度 (TensorRT 8.x 使用 getBindingDimensions)
+    auto outDims = engine->getBindingDimensions(outputIndex);
     outputSize = getSizeByDim(outDims) * sizeof(float);
 
     // ⭐ 日志：输出模型路径和张量形状
@@ -155,13 +182,9 @@ void TrtYolo::preprocess(const cv::Mat& img)
 
 void TrtYolo::infer()
 {
-    // --- TensorRT 10.x 使用 enqueueV3 ---
-    // 1. 必须先绑定张量地址
-    context->setTensorAddress(inputTensorName.c_str(), buffers[0]);
-    context->setTensorAddress(outputTensorName.c_str(), buffers[1]);
-
-    // 2. 执行异步推理
-    context->enqueueV3(stream);
+    // --- TensorRT 8.x 使用 enqueueV2 ---
+    // 直接传入 buffers 数组
+    context->enqueueV2(buffers, stream, nullptr);
 
     cudaMemcpyAsync(hostOutput.data(), buffers[1], outputSize, cudaMemcpyDeviceToHost, stream);
     cudaStreamSynchronize(stream);
@@ -171,8 +194,8 @@ void TrtYolo::postprocess(std::vector<Detection>& results)
 {
     results.clear();
 
-    // 获取输出维度 (TensorRT 10 API)
-    auto outDims = engine->getTensorShape(outputTensorName.c_str());
+    // 获取输出维度 (TensorRT 8.x API)
+    auto outDims = engine->getBindingDimensions(outputIndex);
     if (outDims.nbDims < 3) return;
 
     // ⭐ 自动检测输出张量布局：
@@ -274,7 +297,161 @@ void TrtYolo::postprocess(std::vector<Detection>& results)
                   << std::endl;
     }
 }
-// draw 函数保持不变...
+// ⭐ ONNX → TensorRT Engine 构建函数
+bool TrtYolo::buildEngineFromOnnx(const std::string& onnxPath,
+                                  const std::string& enginePath,
+                                  ILogger& logger,
+                                  int inputW,
+                                  int inputH,
+                                  size_t maxBatchSize,
+                                  bool useFP16)
+{
+    std::cout << "[TrtYolo] Building TensorRT engine from ONNX: " << onnxPath << std::endl;
+    std::cout << "[TrtYolo] Output engine: " << enginePath << std::endl;
+
+    // 1. 创建 builder
+    IBuilder* builder = createInferBuilder(logger);
+    if (!builder) {
+        std::cerr << "[TrtYolo] Failed to create TensorRT builder" << std::endl;
+        return false;
+    }
+
+    // 2. 创建 network (explicit batch mode)
+    const auto explicitBatch = 1U << static_cast<uint32_t>(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
+    INetworkDefinition* network = builder->createNetworkV2(explicitBatch);
+    if (!network) {
+        std::cerr << "[TrtYolo] Failed to create TensorRT network" << std::endl;
+        delete builder;
+        return false;
+    }
+
+    // 3. 创建 ONNX parser
+    nvonnxparser::IParser* parser = nvonnxparser::createParser(*network, logger);
+    if (!parser) {
+        std::cerr << "[TrtYolo] Failed to create ONNX parser" << std::endl;
+        delete network;
+        delete builder;
+        return false;
+    }
+
+    // 4. 解析 ONNX 模型
+    if (!parser->parseFromFile(onnxPath.c_str(), static_cast<int>(ILogger::Severity::kWARNING))) {
+        std::cerr << "[TrtYolo] Failed to parse ONNX model: " << onnxPath << std::endl;
+        for (int i = 0; i < parser->getNbErrors(); ++i) {
+            auto err = parser->getError(i);
+            std::cerr << "  Parser error [" << i << "]: "
+                      << err->desc() << " (file=" << err->file()
+                      << ", line=" << err->line()
+                      << ", func=" << err->func() << ")" << std::endl;
+        }
+        delete parser;
+        delete network;
+        delete builder;
+        return false;
+    }
+
+    std::cout << "[TrtYolo] ONNX model parsed successfully." << std::endl;
+
+    // 5. 配置 builder
+    IBuilderConfig* config = builder->createBuilderConfig();
+    if (!config) {
+        std::cerr << "[TrtYolo] Failed to create builder config" << std::endl;
+        delete parser;
+        delete network;
+        delete builder;
+        return false;
+    }
+
+    // 设置工作空间大小 (TensorRT 8.x: setMemoryPoolLimit)
+    // Jetson 等嵌入式设备显存有限，使用 256MB 而非 1GB
+    config->setMemoryPoolLimit(MemoryPoolType::kWORKSPACE, 256ULL << 20); // 256MB
+    std::cout << "[TrtYolo] Workspace set to 256MB." << std::endl;
+
+    // 设置推理精度
+    bool fp16Enabled = false;
+    if (useFP16 && builder->platformHasFastFp16()) {
+        config->setFlag(BuilderFlag::kFP16);
+        fp16Enabled = true;
+        std::cout << "[TrtYolo] FP16 mode enabled (platform supports fast FP16)." << std::endl;
+    } else if (useFP16 && !builder->platformHasFastFp16()) {
+        std::cout << "[TrtYolo] FP16 requested but not supported on this platform, falling back to FP32." << std::endl;
+    } else {
+        std::cout << "[TrtYolo] Using FP32 mode." << std::endl;
+    }
+
+    // 设置输入张量的维度 (batch=1, channel=3, H, W)
+    auto inputTensorName = network->getInput(0)->getName();
+    network->getInput(0)->setDimensions(Dims4(static_cast<int>(maxBatchSize), 3, inputH, inputW));
+    std::cout << "[TrtYolo] Input tensor: " << inputTensorName
+              << " shape: [" << maxBatchSize << ", 3, " << inputH << ", " << inputW << "]"
+              << std::endl;
+
+    // 6. 构建 engine (序列化)
+    // 设置最大尝试次数：先尝试用户指定的精度，失败则降级到 FP32
+    const int maxAttempts = fp16Enabled ? 2 : 1;
+    IHostMemory* serializedModel = nullptr;
+
+    for (int attempt = 0; attempt < maxAttempts; ++attempt) {
+        if (attempt > 0) {
+            // 第一次尝试失败，降级到 FP32
+            std::cout << "[TrtYolo] FP16 build failed, retrying with FP32..." << std::endl;
+            delete config;
+            config = builder->createBuilderConfig();
+            if (!config) {
+                std::cerr << "[TrtYolo] Failed to create builder config on retry" << std::endl;
+                break;
+            }
+            config->setMemoryPoolLimit(MemoryPoolType::kWORKSPACE, 256ULL << 20);
+            // 不设置 FP16 flag
+            std::cout << "[TrtYolo] Retrying with FP32 mode." << std::endl;
+        }
+
+        serializedModel = builder->buildSerializedNetwork(*network, *config);
+        if (serializedModel) break; // 构建成功
+
+        std::cerr << "[TrtYolo] Attempt " << (attempt + 1) << "/" << maxAttempts
+                  << ": Failed to build serialized TensorRT engine" << std::endl;
+    }
+
+    if (!serializedModel) {
+        std::cerr << "[TrtYolo] All attempts to build TensorRT engine failed." << std::endl;
+        std::cerr << "[TrtYolo] Possible causes: insufficient GPU memory, unsupported ops." << std::endl;
+        delete config;
+        delete parser;
+        delete network;
+        delete builder;
+        return false;
+    }
+
+    std::cout << "[TrtYolo] Engine built successfully. Size: "
+              << serializedModel->size() << " bytes" << std::endl;
+
+    // 7. 写入文件
+    std::ofstream engineFile(enginePath, std::ios::binary);
+    if (!engineFile.is_open()) {
+        std::cerr << "[TrtYolo] Failed to write engine file: " << enginePath << std::endl;
+        delete serializedModel;
+        delete config;
+        delete parser;
+        delete network;
+        delete builder;
+        return false;
+    }
+    engineFile.write(static_cast<const char*>(serializedModel->data()), serializedModel->size());
+    engineFile.close();
+
+    std::cout << "[TrtYolo] Engine saved to: " << enginePath << std::endl;
+
+    // 8. 清理 (TensorRT 8.x 使用 delete 而非 destroy)
+    delete serializedModel;
+    delete config;
+    delete parser;
+    delete network;
+    delete builder;
+
+    return true;
+}
+
 bool TrtYolo::loadClasses(const std::string& classesPath)
 {
     std::ifstream file(classesPath);
@@ -334,4 +511,3 @@ void TrtYolo::draw(cv::Mat& img, const std::vector<Detection>& results)
                     0.6, cv::Scalar(0,0,0), 2);
     }
 }
-

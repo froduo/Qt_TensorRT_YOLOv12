@@ -1,4 +1,4 @@
-#include "networkmanager.h""
+#include "networkmanager.h"
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -12,9 +12,8 @@ NetworkManager::NetworkManager(QObject *parent) : QObject(parent) {
     connect(socket, &QTcpSocket::readyRead, this, &NetworkManager::onReadyRead);
     connect(socket, &QTcpSocket::connected, this, &NetworkManager::onConnected);
     connect(socket, &QTcpSocket::disconnected, this, &NetworkManager::onDisconnected);
-    // 处理连接错误信号 (重要：服务器没开时会触发这个)
-    // 移除 QOverload，直接指向函数地址
-    connect(socket, &QAbstractSocket::errorOccurred,
+    // 处理连接错误信号 (Qt 5.12 兼容：使用旧的 error 信号)
+    connect(socket, static_cast<void (QAbstractSocket::*)(QAbstractSocket::SocketError)>(&QAbstractSocket::error),
             this, &NetworkManager::onErrorOccurred);
 
     // 定时器触发重连
@@ -48,43 +47,48 @@ void NetworkManager::connectToServer(const QString &ip, quint16 port) {
     attemptReconnect();
 }
 void NetworkManager::attemptReconnect() {
-    // 如果已经在连接中或已连接，则不重复操作
-    if (socket->state() == QAbstractSocket::UnconnectedState) {
-        qDebug() << "Attempting to connect to server:" << m_host << ":" << m_port;
-        socket->connectToHost(m_host, m_port);
+    if (socket->state() == QAbstractSocket::ConnectedState) {
+        return;
     }
+    qDebug() << "Attempting to connect to" << m_host << ":" << m_port;
+    socket->connectToHost(m_host, m_port);
 }
-void NetworkManager::onErrorOccurred() {
-    qDebug() << "Socket Error:" << socket->errorString();
-    emit statusChanged(false);
-
-    if (m_autoReconnect) {
-        reconnectTimer->start(); // 出错时（如连接被拒绝）也开启重连
-    }
-}
-void NetworkManager::disconnect() {
-    m_autoReconnect = false; // 手动关闭连接时，禁用自动重连
-    reconnectTimer->stop();
-    socket->disconnectFromHost();
-}
-bool NetworkManager::isConnected() const {
-    return socket->state() == QAbstractSocket::ConnectedState;
+void NetworkManager::onErrorOccurred(QAbstractSocket::SocketError error) {
+    Q_UNUSED(error);
+    qDebug() << "Socket error:" << socket->errorString();
 }
 void NetworkManager::sendDetectionResults(const std::vector<Detection>& results) {
-    if (socket->state() != QAbstractSocket::ConnectedState) return;
-
-    QJsonArray rootArray;
+    QJsonArray detections;
     for (const auto& det : results) {
         QJsonObject obj;
         obj["class_id"] = det.class_id;
-        obj["score"] = double(det.score);
+        obj["score"] = det.score;
         obj["x"] = det.x;
         obj["y"] = det.y;
         obj["w"] = det.w;
         obj["h"] = det.h;
-        rootArray.append(obj);
+        detections.append(obj);
     }
+    QJsonObject root;
+    root["type"] = "detection";
+    root["count"] = static_cast<int>(results.size());
+    root["detections"] = detections;
+    QJsonDocument doc(root);
+    sendResult(QString::fromUtf8(doc.toJson(QJsonDocument::Compact)));
+}
 
-    QJsonDocument doc(rootArray);
-    socket->write(doc.toJson(QJsonDocument::Compact) + "\n"); // 以换行符结尾方便接收端处理
+void NetworkManager::disconnect() {
+    m_autoReconnect = false;
+    reconnectTimer->stop();
+    if (socket->state() == QAbstractSocket::ConnectedState ||
+        socket->state() == QAbstractSocket::ConnectingState) {
+        socket->disconnectFromHost();
+    }
+}
+
+void NetworkManager::sendResult(const QString &jsonResult) {
+    if (socket->state() == QAbstractSocket::ConnectedState) {
+        socket->write(jsonResult.toUtf8());
+        socket->flush();
+    }
 }

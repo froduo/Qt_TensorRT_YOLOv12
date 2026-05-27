@@ -31,9 +31,41 @@ bool InferThread::setEngine(const QString &enginePath, const QString &classesPat
     QFileInfo fi(enginePath);
     if (!fi.exists())
     {
-        LOG_ERR(QString("Engine file not found: %1").arg(enginePath));
-        emit engineLoadFailed("Engine file not found:\n" + enginePath);
-        return false;
+        // ⭐ 如果 .engine 文件不存在，尝试查找同名的 .onnx 文件自动转换
+        QString onnxPath = enginePath;
+        if (onnxPath.endsWith(".engine", Qt::CaseInsensitive)) {
+            onnxPath.replace(onnxPath.length() - 7, 7, ".onnx");
+        } else {
+            onnxPath += ".onnx";
+        }
+
+        QFileInfo onnxFi(onnxPath);
+        if (onnxFi.exists()) {
+            LOG_INFO(QString("Engine file not found, but ONNX file exists: %1").arg(onnxPath));
+            LOG_INFO(QString("Attempting to build engine from ONNX (this may take a while)..."));
+            emit engineLoadFailed(QString("Engine file not found. Converting ONNX to engine...\n%1\n\nPlease wait, this may take several minutes.").arg(onnxPath));
+
+            // 执行 ONNX → Engine 转换
+            bool buildOk = TrtYolo::buildEngineFromOnnx(
+                onnxPath.toStdString(),
+                enginePath.toStdString(),
+                logger);
+
+            if (!buildOk) {
+                QString errMsg = QString("Failed to build TensorRT engine from ONNX:\n%1").arg(onnxPath);
+                LOG_ERR(errMsg);
+                emit engineLoadFailed(errMsg);
+                return false;
+            }
+
+            LOG_INFO(QString("ONNX conversion succeeded, engine saved to: %1").arg(enginePath));
+        } else {
+            LOG_ERR(QString("Engine file not found: %1").arg(enginePath));
+            LOG_ERR(QString("ONNX file also not found: %1").arg(onnxPath));
+            emit engineLoadFailed("Engine file not found:\n" + enginePath + "\n\n"
+                                  "ONNX file also not found:\n" + onnxPath);
+            return false;
+        }
     }
 
     LOG_INFO(QString("Loading TensorRT engine: %1").arg(enginePath));

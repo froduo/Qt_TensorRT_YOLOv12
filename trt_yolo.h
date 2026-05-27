@@ -23,12 +23,26 @@ public:
     ~TrtYolo();
     bool loadClasses(const std::string& classesPath);
 
+    bool isValid() const { return engine != nullptr && context != nullptr; }
+    std::string lastError() const { return m_lastError; }
+
     void preprocess(const cv::Mat& img);
     void infer();
     void postprocess(std::vector<Detection>& results);
     void draw(cv::Mat& img, const std::vector<Detection>& results);
     float confThreshold = 0.25f;
     std::vector<std::string> classNames;
+
+    // ⭐ ONNX → TensorRT Engine 构建函数
+    // 将 onnxPath 转换为 enginePath，返回 true 表示成功
+    static bool buildEngineFromOnnx(const std::string& onnxPath,
+                                    const std::string& enginePath,
+                                    nvinfer1::ILogger& logger,
+                                    int inputW = 640,
+                                    int inputH = 640,
+                                    size_t maxBatchSize = 1,
+                                    bool useFP16 = true);
+
 private:
     bool loadEngine(const std::string& enginePath);
     size_t getSizeByDim(const nvinfer1::Dims& dims);
@@ -64,6 +78,7 @@ private:
 private:
     std::string inputTensorName;
     std::string outputTensorName;
+    std::string m_lastError;
 
     // 建议将 buffers 定义也稍微修改下，避免歧义
     void* buffers[2];

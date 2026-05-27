@@ -15,6 +15,7 @@ public:
     bool isConnected() const;
     // 发送检测结果
     void sendDetectionResults(const std::vector<Detection>& results);
+    void sendResult(const QString &jsonResult);
 signals:
     void commandReceived(QString cmd); // 收到指令信号
     void statusChanged(bool connected); // 连接状态改变信号
@@ -23,7 +24,7 @@ private slots:
     void onReadyRead(); // 处理接收数据
     void onConnected();
     void onDisconnected();
-    void onErrorOccurred(); // 处理连接错误（如服务器没开）
+    void onErrorOccurred(QAbstractSocket::SocketError error); // 处理连接错误（如服务器没开）
     void attemptReconnect(); // 执行重连逻辑
 
 private:
